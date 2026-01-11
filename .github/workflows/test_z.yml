@@ -1,4 +1,4 @@
-name: "Build kernels test-z"
+name: "Build kernels test_z"
 
 env:
   OUT_DIR: "out"
@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "google"
+        default: "codelinaro"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,12 +27,12 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NefaRian-1.0-11012026"
+        default: ""
       buildKSU:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "ksu"
+        default: "both"
         options:
           - "noksu"
           - "ksu"
@@ -41,7 +41,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "wildksu"
+        default: "kowsu"
         options:
           - "kernelsu"
           - "sukisu-ultra"
@@ -54,7 +54,7 @@ on:
         description: "Compiler optimization level"
         required: false
         type: choice
-        default: "O3"
+        default: "O2"
         options:
           - "O2"
           - "O3"
@@ -73,14 +73,6 @@ on:
           - "600"
           - "750"
           - "1000"
-      batteryOpt:
-        description: "Add Battery Optimization (optional, maybe slowing down your potato phones)"
-        required: false
-        type: choice
-        default: "disable"
-        options:
-          - "enable"
-          - "disable"
       bbg:
         description: "Baseband-guard Support (if KSU Enabled)"
         required: true
@@ -386,27 +378,7 @@ jobs:
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
           echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
-          
-      - name: "🔋Apply Battery Optimizations (Optional, if enabled)"
-        if: github.event.inputs.batteryOpt == 'enable'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
-          
-          # Apply the structural logic patch
-          patch -p1 "https://raw.githubusercontent.com/nebixts/kernel_patches/main/batteryOpt.patch"
-          
-          # Enable the master switch in your specific device config
-          echo "CONFIG_BATTERY_SAVER_OPTIMIZATIONS=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_DISABLE_DEBUG_FOR_BATTERY=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          
-          # Add the I/O and VM tweaks directly
-          echo "CONFIG_IOSCHED_ZEN=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_DEFAULT_ZEN=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          echo "CONFIG_DEFAULT_VFS_CACHE_PRESSURE=100" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
 
-          echo "✅ Successfully Integrate Battery Mods into Kconfig System"
-          
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
