@@ -1,4 +1,4 @@
-name: "Build kernels Test-a"
+name: "Build kernels test-z"
 
 env:
   OUT_DIR: "out"
@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: ""
+        default: "-NefaRian-1.0-11012026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
