@@ -1,4 +1,4 @@
-name: "Build kernels test-z"
+name: "Build kernels Test-a"
 
 env:
   OUT_DIR: "out"
@@ -32,7 +32,7 @@ on:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "both"
+        default: "ksu"
         options:
           - "noksu"
           - "ksu"
