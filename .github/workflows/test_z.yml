@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "codelinaro"
+        default: "google"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -32,7 +32,7 @@ on:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "both"
+        default: "ksu"
         options:
           - "noksu"
           - "ksu"
@@ -41,7 +41,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "kowsu"
+        default: "wildksu"
         options:
           - "kernelsu"
           - "sukisu-ultra"
@@ -54,7 +54,7 @@ on:
         description: "Compiler optimization level"
         required: false
         type: choice
-        default: "O2"
+        default: "O3"
         options:
           - "O2"
           - "O3"
@@ -63,7 +63,7 @@ on:
         description: "Kernel tick rate (Hz)"
         required: false
         type: choice
-        default: "250"
+        default: "300"
         options:
           - "default"
           - "100"
@@ -580,10 +580,9 @@ jobs:
           
           # Clone SUSFS4KSU for kernel patches only (not KSU integration)
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
-          git clone --depth=1 https://github.com/nebixts/susfs4ksu.git -b gki-android13-5.15
-          
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
           echo "🔧 Applying SUSFS kernel patch..."
           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
             echo "✅ SUSFS patch successfully applied"
