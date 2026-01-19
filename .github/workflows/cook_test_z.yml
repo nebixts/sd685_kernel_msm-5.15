@@ -235,7 +235,7 @@ jobs:
           }
 
           # custom tickrate options patch
-          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options_patch"
+          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
           
           # Remove existing optimization configs
           sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
