@@ -92,6 +92,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2
 
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "vm.swappiness=60" | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
+
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -430,7 +437,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Install WildKSU with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
       
           echo "✔ Wild KSU installed successfully"
           
@@ -624,7 +631,7 @@ jobs:
          • Kernel: \`Linux ${{ env.KERNEL_VERSION }}\`
          • Android: \`13-16\`
          • Branch: \`${{ github.event.inputs.kernelBranch }}\`
-         • Device: \`${{ github.event.inputs.kernelDevice }}\`
+         • Device: \`Redmi Note 12/13 4G. Pad SE\`
     
          ⚙️ *Configuration:*
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
