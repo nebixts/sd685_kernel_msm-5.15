@@ -37,13 +37,6 @@ on:
           - "noksu"
           - "ksu"
           - "both"
-      ksuVariant:
-        description: "KSU implementation (if KSU enabled)"
-        required: true
-        type: choice
-        default: "next"
-        options:
-          - "next"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -390,7 +383,7 @@ jobs:
           build/build.sh -j$(nproc --all)
           
        - name: "🔧 Setup NEXT with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next'
+        if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
