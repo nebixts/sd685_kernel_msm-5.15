@@ -46,6 +46,7 @@ on:
           - "kernelsu"
           - "sukisu-ultra"
           - "rksu"
+          - "next"
           - "wildksu"
           - "kowsu"
           - "mambosu"
