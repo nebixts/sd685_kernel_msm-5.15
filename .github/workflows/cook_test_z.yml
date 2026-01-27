@@ -27,12 +27,12 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-x.x-ddmmyyyy"
+        default: "-NeFaRiaN-2.x-ddmm2026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "both"
+        default: "ksu"
         options:
           - "noksu"
           - "ksu"
@@ -45,11 +45,8 @@ on:
         options:
           - "kernelsu"
           - "sukisu-ultra"
-          - "rksu"
           - "wildksu"
-          - "kowsu"
-          - "mambosu"
-          - "mambosu-susfs"
+          - "next"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -274,8 +271,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -288,8 +283,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -302,8 +295,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -312,40 +303,10 @@ jobs:
               echo "CONFIG_HZ=300" >> "$CONFIG_FILE"
               echo "CONFIG_HZ_300=y" >> "$CONFIG_FILE"
               ;;
-            350)
-              sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
-              echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
-              echo "CONFIG_HZ=350" >> "$CONFIG_FILE"
-              echo "CONFIG_HZ_350=y" >> "$CONFIG_FILE"
-              ;;
-            400)
-              sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
-              echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
-              echo "CONFIG_HZ=400" >> "$CONFIG_FILE"
-              echo "CONFIG_HZ_400=y" >> "$CONFIG_FILE"
-              ;;
             500)
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -358,8 +319,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -372,8 +331,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -386,8 +343,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -622,56 +577,6 @@ jobs:
           
           echo "✅ Installed SukiSU-Ultra with SUSFS"
 
-      - name: "🔧 Setup rKSU"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'rksu'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          rm -rf ./KernelSU ./drivers/kernelsu
-          
-          # Install rKSU
-          curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-rksu-master
-
-          # Apply SUSFS patch
-          PATCH_URL="https://api.github.com/repos/nebixts/kernel_patches/releases/latest"
-          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
-          
-          if [ -n "$SUSFS_PATCH" ]; then
-            curl -L -o susfs.patch "$SUSFS_PATCH"
-            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
-          fi
-
-          # Apply syscall hooks
-          curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.6.patch"
-          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
-          
-          # Add KSU configs
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KSU_MANUAL_HOOK=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_KPROBES=n
-          EOF
-          
-          echo "✅ Installed rKSU"
-
       - name: "🔧 Setup Wild KSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -763,79 +668,75 @@ jobs:
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
           
-      - name: "🔧 Setup KowSU"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kowsu'
+      - name: "🔧 Setup NEXT with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
           
-          # Install KowSU
-          curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash -s master
-          
-          # Add KSU configs
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          EOF
-          
-          echo "✅ Installed KowSU"
+          echo "📦 Installing NEXT..."
 
-      - name: "🔧 Setup MamboSU"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'mambosu'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          rm -rf ./KernelSU ./drivers/kernelsu
+          # Install NEXT with SUSFS
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          echo "✔ NEXT installed successfully"
           
-          # Install MamboSU
-          curl -LSs "https://raw.githubusercontent.com/nebixts/KernelSU/refs/heads/master/kernel/setup.sh" | bash -s master
-          
-          # Add KSU configs
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          EOF
-          
-          echo "✅ Installed MamboSU"
+          # Clone SUSFS4KSU for kernel patches only (not KSU integration)
+          echo "📦 Cloning SUSFS4KSU for kernel patches..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
-      - name: "🔧 Setup MamboSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'mambosu-susfs'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          rm -rf ./KernelSU ./drivers/kernelsu
-          
-          # Install MamboSU with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/nebixts/KernelSU/refs/heads/susfs-rksu-master/kernel/setup.sh" | bash -s susfs-rksu-master
-
-          # Apply SUSFS patch
-          PATCH_URL="https://api.github.com/repos/nebixts/kernel_patches/releases/latest"
-          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
-          
-          if [ -n "$SUSFS_PATCH" ]; then
-            curl -L -o susfs.patch "$SUSFS_PATCH"
-            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
+          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          echo "🔧 Applying SUSFS kernel patch..."
+          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+            echo "✅ SUSFS patch successfully applied"
+          else
+            echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
-          # Apply syscall hooks
-          curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.6.patch"
-          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           
+          echo "📄 Forcing SUSFS source injection..."
+          
+          # Always replace fs/susfs.c
+          mkdir -p fs
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+          echo "✔ Copied fs/susfs.c"
+          
+          # Always replace include/linux/susfs.h
+          mkdir -p include/linux
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          echo "✔ Copied include/linux/susfs.h"
+          
+          # Also install missing susfs_def.h
+          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
+            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+            echo "✔ Copied include/linux/susfs_def.h"
+          else
+            echo "⚠️ susfs_def.h not found in repo"
+          fi
+          
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
+          
+          # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
+          rm -rf susfs4ksu
+          
+          # Create symbolic link for drivers/kernelsu (if needed by build system)
+          if [ ! -L "drivers/kernelsu" ]; then
+            ln -sf ../KernelSU drivers/kernelsu
+            echo "✔ Created drivers/kernelsu symlink"
+          fi
+
           # Add KSU configs
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KSU_MANUAL_HOOK=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          CONFIG_OVERLAY_FS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -843,7 +744,6 @@ jobs:
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
           CONFIG_KSU_SUSFS_TRY_UMOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
@@ -854,10 +754,9 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           CONFIG_TMPFS_XATTR=y
           CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_KPROBES=n
           EOF
           
-          echo "✅ MamboSU with SUSFS kernel patches fully integrated"
+          echo "🎉 NEXT with SUSFS kernel patches fully integrated"
 
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
