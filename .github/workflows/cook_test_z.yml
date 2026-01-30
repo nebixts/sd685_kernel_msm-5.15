@@ -66,6 +66,7 @@ on:
           - "100"
           - "250"
           - "300"
+          - "350"
           - "400"
           - "500"
           - "600"
@@ -231,7 +232,7 @@ jobs:
           }
 
           # custom tickrate options patch
-          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
+          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options3.patch"
           
           # Remove existing optimization configs
           sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
@@ -270,6 +271,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -283,6 +285,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -296,6 +299,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -305,10 +309,25 @@ jobs:
               echo "CONFIG_HZ=300" >> "$CONFIG_FILE"
               echo "CONFIG_HZ_300=y" >> "$CONFIG_FILE"
               ;;
+            350)
+              sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
+              echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
+              echo "CONFIG_HZ=350" >> "$CONFIG_FILE"
+              echo "CONFIG_HZ_350=y" >> "$CONFIG_FILE"
+              ;;
             400)
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -322,6 +341,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -335,6 +355,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -348,6 +369,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
@@ -361,6 +383,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_350=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
