@@ -12,7 +12,7 @@ on:
         description: "Kernel source URL"
         required: true
         type: string
-        default: "https://github.com/topnotchfreaks/kernel_msm-5.15"
+        default: "https://github.com/nebixts/sd685_kernel_msm-5.15/"
       kernelBranch:
         description: "Kernel branch"
         required: false
@@ -820,7 +820,7 @@ jobs:
       - name: "📦 Create flashable ZIP"
         run: |
           BUILD_TIME=$(date +'%Y-%m-%d')
-          git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b master AnyKernel3
+          git clone --depth=1 https://github.com/nebixts/AnyKernel3 -b master AnyKernel3
           
           # Copy kernels
           find kernels -name "Image.*" -exec cp {} AnyKernel3/ \;
