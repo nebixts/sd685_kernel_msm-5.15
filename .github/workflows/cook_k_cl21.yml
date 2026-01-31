@@ -188,7 +188,7 @@ jobs:
           rm -rf common
 
           # Download Clang 21.1.8 from official LLVM sources
-          CLANG_TAR="clang+llvm-21.1.8-x86_64-linux-gnu.tar.xz"
+          CLANG_TAR="clang+llvm-21.1.8-x86_64-linux-gnu.tar.gz"
           CLANG_URL="https://github.com"
           CLANG_DIR="clang-21.1.8"
 
@@ -196,7 +196,7 @@ jobs:
           mkdir -p prebuilts/clang/host/linux-x86/$CLANG_DIR
     
           # Extracting .tar.xz (Note: tar -xJf is used for xz)
-           tar -xJf $CLANG_TAR -C prebuilts/clang/host/linux-x86/$CLANG_DIR --strip-components=1
+           tar -xzf $CLANG_TAR -C prebuilts/clang/host/linux-x86/$CLANG_DIR --strip-components=1
            rm -rf $CLANG_TAR
 
           # Clean up old prebuilts
