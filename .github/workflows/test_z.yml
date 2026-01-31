@@ -12,7 +12,7 @@ on:
         description: "Kernel source URL"
         required: true
         type: string
-        default: "https://github.com/nebixts/sd685_kernel_msm-5.15/"
+        default: "https://github.com/topnotchfreaks/kernel_msm-5.15"
       kernelBranch:
         description: "Kernel branch"
         required: false
@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: ""
+        default: "-NeFaRiaN-2.x-ddmm2026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -63,7 +63,7 @@ on:
         description: "Kernel tick rate (Hz)"
         required: false
         type: choice
-        default: "300"
+        default: "500"
         options:
           - "default"
           - "100"
