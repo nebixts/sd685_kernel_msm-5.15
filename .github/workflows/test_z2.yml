@@ -376,7 +376,8 @@ jobs:
           case "${{ github.event.inputs.optimizationLevel }}" in
             O2)
               echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$CONFIG_FILE"
-              echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3 >> "$CONFIG_FILE"
+              echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3 is not set" >> "$CONFIG_FILE"
+              echo "# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set" >> "$CONFIG_FILE"
               ;;
             O3)
               echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE is not set" >> "$CONFIG_FILE"
