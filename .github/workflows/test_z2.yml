@@ -467,9 +467,6 @@ jobs:
           apply_patch "$PATCH_FILE"
 
           log "✅ Patch applied successfully"
-
-          # Script sign patch
-          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
           echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
@@ -848,11 +845,22 @@ jobs:
           echo "✅ MamboSU with SUSFS kernel patches fully integrated"
 
       - name: "🔨 Build kernel"
-        working-directory: ${{ env.WORK_DIR }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
         run: |
-          LTO=full \
-          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
-          build/build.sh -j$(nproc --all)
+          export KBUILD_BUILD_USER="p1r377o"
+          export KBUILD_BUILD_HOST="GitHub"
+        
+          make ${args} \
+            LLVM=1 \
+            LTO=full \
+            CC=clang \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            -j8
             
       - name: "🩹 Apply KPM patch (SukiSU-Ultra only)"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
