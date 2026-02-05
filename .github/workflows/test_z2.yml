@@ -1,4 +1,4 @@
-name: "test_z_cl"
+name: "test_k_cl20+"
 
 env:
   OUT_DIR: "out"
@@ -95,6 +95,15 @@ on:
           - "Rv Clang"
 
 jobs:
+  Set-repos:
+    name: "🐂 Parse repository"
+    runs-on: ubuntu-latest
+    outputs:
+      repos: ${{ steps.generate-matrix.outputs.repos }}
+    steps:
+      - name: "😄 Checkout"
+        uses: actions/checkout@v4
+        
   Build-Kernel:
     name: "🚀 Build Kernel"
     runs-on: ubuntu-latest
@@ -298,7 +307,7 @@ jobs:
               mkdir -p $(pwd)/${{ env.OUT_DIR }}
               args="$args O=$(pwd)/${{ env.OUT_DIR }}"
             fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args ARCH=arm64 LLVM=1 LTO=full"
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
