@@ -1,0 +1,43 @@
+name: Sync & Patch android13-5.15
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily sync
+  workflow_dispatch:      # Manual trigger
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Fork
+        uses: [actions/checkout@v4](https://github.com)
+        with:
+          ref: android13-5.15
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Kernel-Sync-Bot"
+          git config --global user.email "bot@example.com"
+
+      - name: Fetch Upstream
+        run: |
+          git remote add upstream [https://android.googlesource.com](https://android.googlesource.com)
+          git fetch upstream android13-5.15
+
+      - name: Attempt Sync
+        run: |
+          # Try to merge upstream into your branch
+          if git merge upstream/android13-5.15 --no-edit; then
+            echo "Sync successful, no conflicts."
+            git push origin android13-5.15
+          else
+            echo "CONFLICT DETECTED!"
+            echo "Upstream changes clashed with your custom patches."
+            echo "Aborting sync. Please resolve conflicts manually on your PC."
+            git merge --abort
+            exit 1 # Fails the workflow so you get an email notification
+          fi
