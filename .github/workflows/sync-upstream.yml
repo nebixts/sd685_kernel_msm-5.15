@@ -13,4 +13,26 @@ jobs:
 
     steps:
       - name: Checkout Fork
-        uses: [actions/checkout](
+        uses: [actions/checkout](https://github.com/nebixts/sd685_kernel_msm-5.15)@v4
+        with:
+          ref: android13-5.15
+          fetch-depth: 0 # Fetches all history for all branches and tags
+
+      - name: Sync from Google Upstream
+        run: |
+          # 1. Identify yourself to Git
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+          # 2. Add the Android Common Kernel as a remote
+          git remote add upstream [https://android.googlesource.com](https://android.googlesource.com)
+          git fetch upstream android13-5.15
+
+          # 3. Merge the latest upstream changes
+          # Using --no-edit to skip interactive editor
+          git merge upstream/android13-5.15 --no-edit
+
+          # 4. Push the updated code back to your fork (origin)
+          git push origin android13-5.15
+          
+        
