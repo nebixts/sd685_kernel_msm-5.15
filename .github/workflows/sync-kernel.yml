@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Fork
-        uses: [actions/checkout@v4](https://github.com)
+        uses: actions/checkout@v4
         with:
           ref: android13-5.15
           fetch-depth: 0
