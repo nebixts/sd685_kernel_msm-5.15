@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Fork
-        uses: [actions/checkout](https://github.com/nebixts/sd685_kernel_msm-5.15)@v4
+        uses: [actions/checkout](https://github.com)@v4
         with:
           ref: android13-5.15
           fetch-depth: 0 # Fetches all history for all branches and tags
