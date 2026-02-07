@@ -326,11 +326,19 @@ jobs:
           chmod +x patch
           ./patch
           mv oImage Image
-
-      - name: "📦 Prepare artifact"
+          
+      - name: 📦 Prepare artifact
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          cp out/dist/Image Image.${{ matrix.variant }}
+          mkdir -p out/dist
+
+          if [ "${{ github.event.inputs.buildToolchains }}" = "android-tools" ]; then
+           src="out/dist/Image"
+          else
+           src="out/arch/arm64/boot/Image"
+          fi
+
+          cp "\( src" "Image. \){{ matrix.variant }}"
 
       - name: "📤 Upload kernel"
         uses: actions/upload-artifact@v4

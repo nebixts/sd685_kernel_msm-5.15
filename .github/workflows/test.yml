@@ -214,22 +214,29 @@ jobs:
               echo "CONFIG_HZ_1000=y" >> "$CONFIG_FILE"
               ;;
           esac
-          
-          # Set localversion
-          if [ -n "${{ github.event.inputs.localVersion }}" ]; then
-            echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
-            patch 
-          fi
-
+ 
           # String patch
-          curl -L -o string.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-skip-android-version-and-kmi-strings.patch" 
-          patch -p1 < string.patch || echo "Warning: Strings patch failed"
+          # curl -L -o string.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-skip-android-version-and-kmi-strings.patch" 
+          # patch -p1 < string.patch || echo "Warning: Strings patch failed"
           
           # Basic optimizations
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} optimization"
           echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
+
+      - name: "🔧 Set custom localversion in build.config"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+
+          # Remove any existing LOCALVERSION lines to prevent duplication
+          sed -i '/^LOCALVERSION=/d' "$CONFIG_FILE"
+
+          # Add our custom value
+          if [ -n "${{ github.event.inputs.localVersion }}" ]; then
+            echo "LOCALVERSION=${{ github.event.inputs.localVersion }}" >> "$CONFIG_FILE"
+          fi
 
       - name: "🔧 Setup KernelSU - Official with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu'
