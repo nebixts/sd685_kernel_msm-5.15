@@ -565,7 +565,7 @@ jobs:
          ⚙️ *Configuration:*
          • LTO: \`${{ github.event.inputs.LTOOptimizations }}\`
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
-         • Tick Rate: \`${{ github.event.inputs.tickRate }}Hz\`
+         • Tick Rate: \`${{ github.event.inputs.tickRate }}\`
          • Build Type: \`${{ github.event.inputs.buildKSU }}\`${KSU_TEXT}
          • SUSFS: \`Enabled (GKI Android13-5.15)\`
          • Local Version: \`${{ github.event.inputs.localVersion }}\`
@@ -591,7 +591,7 @@ jobs:
          ⚙️ *Configuration:*
          • LTO: \`${{ github.event.inputs.LTOOptimizations }}\`
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
-         • Tick Rate: \`${{ github.event.inputs.tickRate }}Hz\`
+         • Tick Rate: \`${{ github.event.inputs.tickRate }}\`
          • Build Type: \`${{ github.event.inputs.buildKSU }}\`${KSU_TEXT}
          • SUSFS: \`Enabled (GKI Android13-5.15)\`
          • Local Version: \`${{ github.event.inputs.localVersion }}\`
