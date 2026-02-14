@@ -227,16 +227,25 @@ jobs:
       - name: "⚙️ Configure kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          # Define the config file path
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          
-          # Set localversion
-          if [ -n "${{ github.event.inputs.localVersion }}" ]; then
-            echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
-          fi
-          
-          # Basic optimizations
-          echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+         # Define the config file path
+         CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+    
+         # Remove any existing LTO FULL configuration
+         sed -i '/^CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
+    
+         # Set localversion
+         if [ -n "${{ github.event.inputs.localVersion }}" ]; then
+          echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
+         fi
+    
+         # LTO Configuration - Enable Thin LTO only
+         echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
+         echo "# CONFIG_LTO_CLANG_FULL is not set" >> "$CONFIG_FILE"
+         echo "CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
+         echo "CONFIG_THINLTO=y" >> "$CONFIG_FILE"
+    
+         # Basic optimizations
+         echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
 
       - name: "🔧 Setup SukiSU-Ultra"
         if: matrix.variant == 'ksu'
@@ -330,16 +339,16 @@ jobs:
       - name: 📦 Prepare artifact
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          mkdir -p out/dist
+         mkdir -p out/dist
 
-          if [ "${{ github.event.inputs.buildToolchains }}" = "android-tools" ]; then
-           src="out/dist/Image"
-          else
-           src="out/arch/arm64/boot/Image"
-          fi
+         if [ "${{ github.event.inputs.buildToolchains }}" = "android-tools" ]; then
+          src="out/dist/Image"
+         else
+          src="${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/Image"
+         fi
 
-          cp "\( src" "Image. \){{ matrix.variant }}"
-
+         cp "${src}" "out/dist/Image.${{ matrix.variant }}"
+    
       - name: "📤 Upload kernel"
         uses: actions/upload-artifact@v4
         with:
