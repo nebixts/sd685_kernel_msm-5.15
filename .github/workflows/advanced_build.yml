@@ -65,7 +65,7 @@ on:
         options:
           - "android-tools"
           - "custom-tools"
-      LTOoptimizations:
+      LTOOptimizations:
         description: "Choose LTO"
         required: true
         type: choice
@@ -273,23 +273,30 @@ jobs:
          fi
     
          # LTO Configuration - Enable Thin LTO only
-         echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
-         echo "# CONFIG_LTO_CLANG_FULL is not set" >> "$CONFIG_FILE"
-         echo "CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
-         echo "CONFIG_THINLTO=y" >> "$CONFIG_FILE"
+         if [ "${{ github.event.inputs.LTOOptimizations }}" = "thin" ]; then
+           sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
+           echo "# CONFIG_LTO_CLANG_FULL is not set" >> "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
+           echo "CONFIG_THINLTO=y" >> "$CONFIG_FILE"
+         else
+           sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG_FULL=y" >> "$CONFIG_FILE"
+           echo "# CONFIG_LTO_CLANG_THIN is not set" >> "$CONFIG_FILE"
+           echo "# CONFIG_THINLTO is not set" >> "$CONFIG_FILE"
+         fi
 
          # Full Metamodule Support
-         cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KALLSYMS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_OVERLAY_FS=y
-          EOF
+         echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+         echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
+         echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
+         echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
           
          # Remove existing optimization configs
-          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
-          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
-          sed -i '/CONFIG_CC_OPTIMIZE_FOR_SIZE/d' "$CONFIG_FILE"
+         sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
+         sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
+         sed -i '/CONFIG_CC_OPTIMIZE_FOR_SIZE/d' "$CONFIG_FILE"
           
           # Apply selected optimization level
           case "${{ github.event.inputs.optimizationLevel }}" in
@@ -353,7 +360,7 @@ jobs:
               ;;
           esac
 
-         # Sign Builds
+          # Sign Builds
           curl -L -o sign.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch" 
           patch -p1 < sign.patch || echo "Warning: Strings patch failed"
           
@@ -556,7 +563,7 @@ jobs:
          • Device: \`${{ github.event.inputs.kernelDevice }}\`
     
          ⚙️ *Configuration:*
-         • LTO: \`${{ github.event.inputs.LTOoptimization }}\`
+         • LTO: \`${{ github.event.inputs.LTOOptimizations }}\`
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
          • Tick Rate: \`${{ github.event.inputs.tickRate }}Hz\`
          • Build Type: \`${{ github.event.inputs.buildKSU }}\`${KSU_TEXT}
@@ -582,7 +589,7 @@ jobs:
          • Device: \`Redmi Note 12/13 4G. Pad SE\`
     
          ⚙️ *Configuration:*
-         • LTO: \`${{ github.event.inputs.LTOoptimizations }}\`
+         • LTO: \`${{ github.event.inputs.LTOOptimizations }}\`
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
          • Tick Rate: \`${{ github.event.inputs.tickRate }}Hz\`
          • Build Type: \`${{ github.event.inputs.buildKSU }}\`${KSU_TEXT}
