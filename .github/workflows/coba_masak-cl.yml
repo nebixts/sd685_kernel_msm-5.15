@@ -298,16 +298,27 @@ jobs:
            echo "# CONFIG_THINLTO is not set" >> "$CONFIG_FILE"
          fi
 
-         # Full Metamodule Support
-         echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
-         echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
-         echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
-         echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
+    - name: "⚙️ Configure kernel optimization and tick rate"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
           
-         # Remove existing optimization configs
-         sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
-         sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
-         sed -i '/CONFIG_CC_OPTIMIZE_FOR_SIZE/d' "$CONFIG_FILE"
+          # Helper
+          apply_patch() {
+            local url="$1";
+            local file=$(basename "$url")
+            curl -L -o "$file" "$url"
+            patch -p1 < "$file" || echo "::warning::Hunks failed in $file"
+            rm -f "$file"
+          }
+
+          # custom tickrate options patch
+          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
+          
+          # Remove existing optimization configs
+          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
+          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
+          sed -i '/CONFIG_CC_OPTIMIZE_FOR_SIZE/d' "$CONFIG_FILE"
           
           # Apply selected optimization level
           case "${{ github.event.inputs.optimizationLevel }}" in
@@ -320,6 +331,10 @@ jobs:
               echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE is not set" >> "$CONFIG_FILE"
               echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y" >> "$CONFIG_FILE"
               echo "# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set" >> "$CONFIG_FILE"
+              
+              patch -p1 "https://raw.githubusercontent.com/nebixts/kernel_patches/main/add_-03.patch"
+          
+              grep "KBUILD_CFLAGS += -O3" Makefile || (echo "Patch failed!" && exit 1)
               ;;
             Os)
               echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE is not set" >> "$CONFIG_FILE"
@@ -327,7 +342,7 @@ jobs:
               echo "CONFIG_CC_OPTIMIZE_FOR_SIZE=y" >> "$CONFIG_FILE"
               ;;
           esac
-                   
+         
           # Apply selected tick rate
           case "${{ github.event.inputs.tickRate }}" in
           default)
@@ -337,6 +352,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -349,6 +365,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -361,6 +378,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -369,10 +387,24 @@ jobs:
               echo "CONFIG_HZ=300" >> "$CONFIG_FILE"
               echo "CONFIG_HZ_300=y" >> "$CONFIG_FILE"
               ;;
+            400)
+              sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
+              echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
+              echo "CONFIG_HZ=400" >> "$CONFIG_FILE"
+              echo "CONFIG_HZ_400=y" >> "$CONFIG_FILE"
+              ;;
             500)
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -385,6 +417,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -397,6 +430,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -409,6 +443,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -419,29 +454,31 @@ jobs:
               ;;
           esac
           
+          # Set localversion
+          if [ -n "${{ github.event.inputs.localVersion }}" ]; then
+            echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
+            echo "CONFIG_LOCALVERSION_AUTO=n\"" >> "$CONFIG_FILE"
+          fi
+          
           # Basic optimizations
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
-
-          # Performance configs
+          
+          # Extra TCP configs
           cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
           CONFIG_TCP_CONG_ADVANCED=y
           CONFIG_TCP_CONG_BIC=n
           CONFIG_TCP_CONG_WESTWOOD=y
           CONFIG_TCP_CONG_HTCP=n
           CONFIG_TCP_CONG_BBR=y
           CONFIG_DEFAULT_WESTWOOD=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
+
+          # Script sign patch
+          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
           
-          echo "✅ Basic configs added"
-          
-          # Sign Builds
-          curl -L -o sign.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch" 
-          patch -p1 < sign.patch || echo "Warning: Strings patch failed"
-     
+          echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
+          echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
+
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -449,8 +486,8 @@ jobs:
           echo "Adding BBG...";
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
-            
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security
+          
       - name: "🔧 Setup Wild KSU with SUSFS"
         if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -569,7 +606,7 @@ jobs:
         
           make ${args} \
             LLVM=1 \
-            LTO=thin \
+            LTO=full \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
