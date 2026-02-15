@@ -297,10 +297,10 @@ jobs:
            echo "# CONFIG_LTO_CLANG_THIN is not set" >> "$CONFIG_FILE"
            echo "# CONFIG_THINLTO is not set" >> "$CONFIG_FILE"
          fi
-
-    - name: "⚙️ Configure kernel optimization and tick rate"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
+         
+       - name: "⚙️ Configure kernel optimization and tick rate"
+         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+         run: |
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
           
           # Helper
@@ -352,7 +352,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -365,7 +364,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -378,7 +376,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -391,7 +388,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -404,7 +400,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -417,7 +412,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -430,7 +424,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
@@ -443,7 +436,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_400=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
