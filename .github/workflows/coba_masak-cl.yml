@@ -105,7 +105,7 @@ jobs:
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
-          echo "BUILD_TIME=$(date +'%d-%m-%Y')" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
@@ -303,6 +303,20 @@ jobs:
          echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
          echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
+      
+         # Performance configs
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+          CONFIG_TCP_CONG_ADVANCED=y
+          CONFIG_TCP_CONG_BIC=n
+          CONFIG_TCP_CONG_WESTWOOD=y
+          CONFIG_TCP_CONG_HTCP=n
+          CONFIG_TCP_CONG_BBR=y
+          CONFIG_DEFAULT_WESTWOOD=y
+          CONFIG_OVERLAY_FS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          EOF
           
          # Remove existing optimization configs
          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
@@ -417,21 +431,7 @@ jobs:
               echo "CONFIG_HZ=1000" >> "$CONFIG_FILE"
               echo "CONFIG_HZ_1000=y" >> "$CONFIG_FILE"
               ;;
-          esac
-
-          # Performance configs
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
-          CONFIG_TCP_CONG_ADVANCED=y
-          CONFIG_TCP_CONG_BIC=n
-          CONFIG_TCP_CONG_WESTWOOD=y
-          CONFIG_TCP_CONG_HTCP=n
-          CONFIG_TCP_CONG_BBR=y
-          CONFIG_DEFAULT_WESTWOOD=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          EOF
+          esac     
           
           # Sign Builds
           curl -L -o sign.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch" 
@@ -590,7 +590,7 @@ jobs:
         with:
           name: kernel-${{ matrix.variant }}
           path: ${{ env.WORK_DIR }}/out/dist/Image.${{ matrix.variant }}
-          retention-days: 7
+          retention-days: 3
 
   Package-Kernels:
     name: "📦 Package kernels"
@@ -604,7 +604,7 @@ jobs:
 
       - name: "📦 Create flashable ZIP"
         run: |
-          BUILD_TIME=$(date +'%d-%m-%Y')
+          BUILD_TIME=$(date +'%Y-%m-%d')
           git clone --depth=1 https://github.com/nebixts/AnyKernel3 -b master AnyKernel3
           
           # Copy kernels
