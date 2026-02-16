@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.x-ddmm2026"
+        default: "-NeFaRiaN-3.X-X-ddmm2026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -388,7 +388,6 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
           
-
       - name: "🔧 Setup KernelSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -564,9 +563,9 @@ jobs:
           EOF
           
           echo "✅ Installed rKSU"
-
+          
       - name: "🔧 Setup Wild KSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
+        if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
@@ -574,15 +573,16 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Install WildKSU with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s wild
-          
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
+      
           echo "✔ Wild KSU installed successfully"
           
           # Clone SUSFS4KSU for kernel patches only (not KSU integration)
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-
+          
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          
           echo "🔧 Applying SUSFS kernel patch..."
           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
             echo "✅ SUSFS patch successfully applied"
@@ -626,8 +626,8 @@ jobs:
             ln -sf ../KernelSU drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
-
-          # Add KSU configs
+          
+          # Add Wild KSU configs with SUSFS
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
@@ -650,8 +650,6 @@ jobs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
@@ -819,7 +817,7 @@ jobs:
 
       - name: "📦 Create flashable ZIP"
         run: |
-          BUILD_TIME=$(date +'%Y-%m-%d')
+          BUILD_TIME=$(date +'%d-%m-%Y')
           git clone --depth=1 https://github.com/nebixts/AnyKernel3 -b master AnyKernel3
           
           # Copy kernels
