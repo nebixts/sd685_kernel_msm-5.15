@@ -105,7 +105,7 @@ jobs:
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
-          echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date +'%d-%m-%Y')" >> $GITHUB_ENV
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
@@ -225,11 +225,11 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"
       
-      - name: 📐 Setup SWAP 8GB
+      - name: 📐 Setup SWAP 10GB
         if: github.event.inputs.buildToolchains == 'android-tools'
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 8
+            swap-size-gb: 10
 
       - name: 📐 Setup SWAP 20GB
         if: github.event.inputs.buildToolchains == 'custom-tools'
@@ -590,7 +590,7 @@ jobs:
         with:
           name: kernel-${{ matrix.variant }}
           path: ${{ env.WORK_DIR }}/out/dist/Image.${{ matrix.variant }}
-          retention-days: 3
+          retention-days: 7
 
   Package-Kernels:
     name: "📦 Package kernels"
@@ -604,7 +604,7 @@ jobs:
 
       - name: "📦 Create flashable ZIP"
         run: |
-          BUILD_TIME=$(date +'%Y-%m-%d')
+          BUILD_TIME=$(date +'%d-%m-%Y')
           git clone --depth=1 https://github.com/nebixts/AnyKernel3 -b master AnyKernel3
           
           # Copy kernels
