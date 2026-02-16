@@ -304,20 +304,14 @@ jobs:
          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
          echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
       
-         # Performance configs
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
-          CONFIG_TCP_CONG_ADVANCED=y
-          CONFIG_TCP_CONG_BIC=n
-          CONFIG_TCP_CONG_WESTWOOD=y
-          CONFIG_TCP_CONG_HTCP=n
-          CONFIG_TCP_CONG_BBR=y
-          CONFIG_DEFAULT_WESTWOOD=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          EOF
-          
+         # Extra TCP configs
+         echo "CONFIG_TCP_CONG_ADVANCED=y" >> "$CONFIG_FILE"
+         echo "CONFIG_TCP_CONG_BIC=n" >> "$CONFIG_FILE"
+         echo "CONFIG_TCP_CONG_WESTWOOD=y" >> "$CONFIG_FILE"
+         echo "CONFIG_TCP_CONG_HTCP=n" >> "$CONFIG_FILE"
+         echo "CONFIG_TCP_CONG_BBR=y" >> "$CONFIG_FILE"
+         echo "CONFIG_DEFAULT_WESTWOOD=y" >> "$CONFIG_FILE"
+                   
          # Remove existing optimization configs
          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
