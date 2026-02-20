@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-G-dd022026"
+        default: "-NeFaRiaN-3.0-X-ddmm2026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -41,13 +41,13 @@ on:
         description: "Kernel tick rate (Hz)"
         required: false
         type: choice
-        default: "575"
+        default: "500"
         options:
           - "default"
           - "100"
           - "250"
           - "300"
-          - "575"
+          - "500"
           - "600"
           - "750"
           - "1000"
@@ -172,7 +172,7 @@ jobs:
             printf "%s" "$latest_url"  # Use printf to output only the URL
           }
       
-          clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
+          clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
       
           echo "✅ Clang URL: $clang_url"
       
@@ -225,11 +225,11 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"
       
-      - name: 📐 Setup SWAP 16GB
+      - name: 📐 Setup SWAP 12GB
         if: github.event.inputs.buildToolchains == 'android-tools'
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 16
+            swap-size-gb: 12
 
       - name: 📐 Setup SWAP 24GB
         if: github.event.inputs.buildToolchains == 'custom-tools'
@@ -336,7 +336,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
@@ -348,7 +348,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
@@ -360,7 +360,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
@@ -368,23 +368,23 @@ jobs:
               echo "CONFIG_HZ=300" >> "$CONFIG_FILE"
               echo "CONFIG_HZ_300=y" >> "$CONFIG_FILE"
               ;;
-            575)
+            500)
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
-              echo "CONFIG_HZ=575" >> "$CONFIG_FILE"
-              echo "CONFIG_HZ_575=y" >> "$CONFIG_FILE"
+              echo "CONFIG_HZ=500" >> "$CONFIG_FILE"
+              echo "CONFIG_HZ_500=y" >> "$CONFIG_FILE"
               ;;
             600)
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
@@ -396,7 +396,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
@@ -408,7 +408,7 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_575=/d' "$CONFIG_FILE"
+              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
