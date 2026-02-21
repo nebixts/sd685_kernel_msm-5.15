@@ -98,9 +98,13 @@ jobs:
         run: |
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          sudo apt-get update -qq
-          sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
-
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential flex g++-multilib \
+            gcc-multilib git gnupg gperf lib32ncurses5-dev lib32readline-dev \
+            lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev \
+            libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool \
+            squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3
+            
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -248,7 +252,6 @@ jobs:
         
          # Setup Config and Apply Optimizations
           make O=out ARCH=arm64 ${{ env.DEFCONFIG }}    
-          make O=out ARCH=arm64 olddefconfig
           
          # Disable problematic headers for Clang 23
           scripts/config --file out/.config --disable IKHEADERS
