@@ -249,12 +249,6 @@ jobs:
          echo "CONFIG_TCP_CONG_HTCP=n" >> "$CONFIG_FILE"
          echo "CONFIG_TCP_CONG_BBR=y" >> "$CONFIG_FILE"
          echo "CONFIG_DEFAULT_WESTWOOD=y" >> "$CONFIG_FILE"
-        
-         # Setup Config and Apply Optimizations
-          make O=out ARCH=arm64 ${{ env.DEFCONFIG }}    
-          
-         # Disable problematic headers for Clang 23
-          scripts/config --file out/.config --disable IKHEADERS
           
          # Remove existing optimization configs
          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
