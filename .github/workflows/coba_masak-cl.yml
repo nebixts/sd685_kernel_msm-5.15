@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-X-ddmm2026"
+        default: "-NeFaRiaN-3.0-G-21022026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -225,17 +225,17 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"
       
-      - name: 📐 Setup SWAP 12GB
+      - name: 📐 Setup SWAP 10GB
         if: github.event.inputs.buildToolchains == 'android-tools'
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 12
+            swap-size-gb: 10
 
-      - name: 📐 Setup SWAP 24GB
+      - name: 📐 Setup SWAP 20GB
         if: github.event.inputs.buildToolchains == 'custom-tools'
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 24
+            swap-size-gb: 20
             
       - name: 📐 Tune Swap
         if: github.event.inputs.buildToolchains == 'custom-tools'
@@ -253,13 +253,22 @@ jobs:
               mkdir -p $(pwd)/${{ env.OUT_DIR }}
               args="$args O=$(pwd)/${{ env.OUT_DIR }}"
             fi
-            args="$args ARCH=arm64 LLVM=1 LTO=full"
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
             args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
- 
+
+      - name: "📝 Append custom Makefile line"
+        if: github.event.inputs.buildToolchains == 'custom-tools'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          # temporary clang compiler fixup
+          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+          echo 'CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+          echo "Custom Makefile line added successfully"
+      
       - name: "⚙️ Configure kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -274,19 +283,19 @@ jobs:
           echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
          fi
     
-         # LTO Configuration - Enable Full LTO only
-         if [ "${{ github.event.inputs.LTOOptimizations }}" = "full" ]; then
-           sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
-           echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
-           echo "# CONFIG_LTO_CLANG_FULL=y" >> "$CONFIG_FILE"
-           echo "CONFIG_LTO_CLANG_THIN is not set" >> "$CONFIG_FILE"
-           echo "CONFIG_THINLTO is not set" >> "$CONFIG_FILE"
-         else
+         # LTO Configuration - Enable Thin LTO only
+         if [ "${{ github.event.inputs.LTOOptimizations }}" = "thin" ]; then
            sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
            echo "CONFIG_LTO_CLANG is not set" >> "$CONFIG_FILE"
-           echo "CONFIG_LTO_CLANG_FULL is not set" >> "$CONFIG_FILE"
-           echo "# CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
-           echo "# CONFIG_THINLTO=y" >> "$CONFIG_FILE"
+           echo "# CONFIG_LTO_CLANG_FULL is not set" >> "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
+           echo "CONFIG_THINLTO=y" >> "$CONFIG_FILE"
+         else
+           sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
+           echo "CONFIG_LTO_CLANG_FULL=y" >> "$CONFIG_FILE"
+           echo "# CONFIG_LTO_CLANG_THIN is not set" >> "$CONFIG_FILE"
+           echo "# CONFIG_THINLTO is not set" >> "$CONFIG_FILE"
          fi
 
          # Full Metamodule Support
@@ -336,9 +345,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=100" >> "$CONFIG_FILE"
@@ -348,9 +354,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=250" >> "$CONFIG_FILE"
@@ -360,9 +363,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=300" >> "$CONFIG_FILE"
@@ -408,9 +408,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=1000" >> "$CONFIG_FILE"
@@ -524,10 +521,10 @@ jobs:
         if: github.event.inputs.buildToolchains == 'android-tools'
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          if [ "${{ github.event.inputs.LTOoptimizations }}" = "full" ]; then
-           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
-          else
+          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
            LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          else
+           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
           
       - name: "👍 Make defconfig"
@@ -549,7 +546,7 @@ jobs:
         
           make ${args} \
             LLVM=1 \
-            LTO=full \
+            LTO=thin \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
@@ -596,7 +593,7 @@ jobs:
           find kernels -name "Image.*" -exec cp {} AnyKernel3/ \;
           
           # Create ZIP
-          ZIP_NAME="NeFaRiaN_${{ github.event.inputs.kernelBranch }}_${BUILD_TIME}.zip"
+          ZIP_NAME="nefarian_${{ github.event.inputs.kernelBranch }}_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
