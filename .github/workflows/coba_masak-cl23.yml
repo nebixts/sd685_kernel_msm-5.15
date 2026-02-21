@@ -60,6 +60,14 @@ on:
           - "O2"
           - "O3"
           - "Os"
+      LTOOptimizations:
+        description: "Choose LTO"
+        required: true
+        type: choice
+        default: "thin"
+        options:
+          - "thin"
+          - "full"
       BBG:
         description: "Baseband-guard Support (if KSU Enabled)"
         required: true
@@ -100,7 +108,6 @@ jobs:
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
       - name: "💫 Get Toolchains"
-        if: github.event.inputs.buildToolchains == 'custom-tools'
         run: |
           set -e  # Exit on errors
       
@@ -171,19 +178,16 @@ jobs:
           clang --version || echo "❌ Clang not found in PATH!"
       
       - name: 📐 Setup SWAP 20GB
-        if: github.event.inputs.buildToolchains == 'custom-tools'
         uses: pierotofy/set-swap-space@master
         with:
             swap-size-gb: 20
             
       - name: 📐 Tune Swap
-        if: github.event.inputs.buildToolchains == 'custom-tools'
         run: |
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
             
       - name: "😎 Set args for GKI kernels"
-        if: github.event.inputs.buildToolchains == 'custom-tools'
         id: generate-args
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -199,6 +203,15 @@ jobs:
             args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
 
+      - name: "📝 Append custom Makefile line"
+        if: github.event.inputs.buildToolchains == 'custom-tools'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          # temporary clang compiler fixup
+          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+          echo 'CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+          echo "Custom Makefile line added successfully"
+      
       - name: "⚙️ Configure kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -476,15 +489,10 @@ jobs:
         working-directory: ${{ env.WORK_DIR }}
         run: |
          mkdir -p out/dist
-
-         if [ "${{ github.event.inputs.buildToolchains }}" = "android-tools" ]; then
-          src="out/dist/Image"
-         else
-          src="${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/Image"
-         fi
-
+         src="${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/Image"
          cp "${src}" "out/dist/Image.${{ matrix.variant }}"
-    
+         fi
+         
       - name: "📤 Upload kernel"
         uses: actions/upload-artifact@v4
         with:
