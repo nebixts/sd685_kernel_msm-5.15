@@ -202,15 +202,7 @@ jobs:
             args="$args AR=llvm-ar"
             args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
-
-      - name: "📝 Append custom Makefile line"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          # temporary clang compiler fixup
-          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-          echo 'CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
-          echo "Custom Makefile line added successfully"
-      
+ 
       - name: "⚙️ Configure kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -253,7 +245,14 @@ jobs:
          echo "CONFIG_TCP_CONG_HTCP=n" >> "$CONFIG_FILE"
          echo "CONFIG_TCP_CONG_BBR=y" >> "$CONFIG_FILE"
          echo "CONFIG_DEFAULT_WESTWOOD=y" >> "$CONFIG_FILE"
-                   
+        
+         # Setup Config and Apply Optimizations
+          make O=out ARCH=arm64 ${{ env.DEFCONFIG }}    
+          make O=out ARCH=arm64 olddefconfig
+          
+         # Disable problematic headers for Clang 23
+          scripts/config --file out/.config --disable IKHEADERS
+          
          # Remove existing optimization configs
          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
          sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
@@ -459,31 +458,26 @@ jobs:
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
           
-      - name: "👍 Make defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
-        run: |
-          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
-
       - name: "🎶 Build kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
+          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
+          
           export KBUILD_BUILD_USER="p1r377o"
           export KBUILD_BUILD_HOST="GitHub"
-        
-          make ${args} \
-            LLVM=1 \
-            LTO=thin \
+
+          export PATH="${{ env.CLANG_PATH }}/bin:$PATH"
+          make -j$(nproc) O=out \
+            ARCH=arm64 \
             CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
-            -j8
-          
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            KCFLAGS="-Wno-error -Wno-default-const-init-unsafe -Wno-uninitialized-const-pointer -Wno-enum-enum-conversion"
+            
       - name: 📦 Prepare artifact
         working-directory: ${{ env.WORK_DIR }}
         run: |
