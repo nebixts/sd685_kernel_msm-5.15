@@ -204,7 +204,6 @@ jobs:
             echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "📝 Append custom Makefile line"
-        if: github.event.inputs.buildToolchains == 'custom-tools'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           # temporary clang compiler fixup
