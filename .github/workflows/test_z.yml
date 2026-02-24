@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "codelinaro"
+        default: "zepharo"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.7-C-21022026"
+        default: "-NeFaRiaN-2.8-Z-24022026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -173,7 +173,12 @@ jobs:
           else
             echo "No swap requested (swapSizeGB=${SWAP_GB})"
           fi
-      
+
+      - name: 📐 Setup SWAP 10GB
+        uses: pierotofy/set-swap-space@master
+        with:
+            swap-size-gb: 10
+     
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -189,18 +194,19 @@ jobs:
           rm -rf .repo
           rm -rf common
 
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
-          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.1.0/clang-r584948b.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-r584948b
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz -C prebuilts/clang/host/linux-x86/clang-r584948b
+          rm -rf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz
 
+          rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
-          
+         
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r584948b/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
           sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -218,11 +224,6 @@ jobs:
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
    
-      - name: 📐 Setup SWAP 10GB
-        uses: pierotofy/set-swap-space@master
-        with:
-            swap-size-gb: 10
-     
       - name: "⚙️ Configure kernel optimization and tick rate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -277,9 +278,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=100" >> "$CONFIG_FILE"
@@ -289,9 +287,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=250" >> "$CONFIG_FILE"
@@ -301,9 +296,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=300" >> "$CONFIG_FILE"
@@ -349,9 +341,6 @@ jobs:
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_250=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_300=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_500=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_600=/d' "$CONFIG_FILE"
-              sed -i '/^CONFIG_HZ_750=/d' "$CONFIG_FILE"
               sed -i '/^CONFIG_HZ_1000=/d' "$CONFIG_FILE"
               echo "CONFIG_NO_HZ_IDLE=y" >> "$CONFIG_FILE"
               echo "CONFIG_HZ=1000" >> "$CONFIG_FILE"
