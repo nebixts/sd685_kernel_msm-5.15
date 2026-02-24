@@ -174,11 +174,6 @@ jobs:
             echo "No swap requested (swapSizeGB=${SWAP_GB})"
           fi
 
-      - name: 📐 Setup SWAP 10GB
-        uses: pierotofy/set-swap-space@master
-        with:
-            swap-size-gb: 10
-     
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -224,6 +219,11 @@ jobs:
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
    
+      - name: 📐 Setup SWAP 10GB
+        uses: pierotofy/set-swap-space@master
+        with:
+            swap-size-gb: 10
+     
       - name: "⚙️ Configure kernel optimization and tick rate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
