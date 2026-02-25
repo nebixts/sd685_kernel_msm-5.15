@@ -45,11 +45,7 @@ on:
         options:
           - "kernelsu"
           - "sukisu-ultra"
-          - "rksu"
           - "wildksu"
-          - "kowsu"
-          - "mambosu"
-          - "mambosu-susfs"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -223,7 +219,11 @@ jobs:
         uses: pierotofy/set-swap-space@master
         with:
             swap-size-gb: 20
-     
+
+      - name: Fix KVM Uninitialized Variable Error
+        run: |
+          sed -i 's/u64 clidr;/u64 clidr = 0;/g' common/arch/arm64/kvm/sys_regs.c
+
       - name: "⚙️ Configure kernel optimization and tick rate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
