@@ -220,10 +220,6 @@ jobs:
         with:
             swap-size-gb: 20
 
-      - name: Fix KVM Uninitialized Variable Error
-        run: |
-          sed -i 's/u64 clidr;/u64 clidr = 0;/g' common/arch/arm64/kvm/sys_regs.c
-
       - name: "⚙️ Configure kernel optimization and tick rate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -601,7 +597,7 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          LTO=full \
+          LTO=thin \
           BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
           build/build.sh -j$(nproc --all)
             
