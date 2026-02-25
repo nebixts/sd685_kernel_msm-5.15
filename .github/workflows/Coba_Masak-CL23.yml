@@ -1,4 +1,4 @@
-name: "Coba_Masak-cL"
+name: "Coba_Masak-CL23"
 
 env:
   OUT_DIR: "out"
@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-G-21022026"
+        default: "-NeFaRiaN-1.0-Z-26022026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
