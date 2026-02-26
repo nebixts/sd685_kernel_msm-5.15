@@ -349,8 +349,11 @@ jobs:
             echo "CONFIG_LOCALVERSION_AUTO=n\"" >> "$CONFIG_FILE"
           fi
           
-          # Basic optimizations
+          # Full Metamodule Support
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
+          echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
           
           # Extra TCP configs
           cat >> "$CONFIG_FILE" << 'EOF'
