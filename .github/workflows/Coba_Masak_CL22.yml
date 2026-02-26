@@ -582,3 +582,4 @@ jobs:
                  -d text="❌ Kernel build failed - Optimization: -${{ github.event.inputs.optimizationLevel }}, Tick: ${{ github.event.inputs.tickRate }}Hz" \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage";
           fi
+
