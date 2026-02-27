@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "codelinaro"
+        default: "zepharo"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.8-C-27022026"
+        default: "-NeFaRiaN-2.9-Z-27022026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -184,7 +184,7 @@ jobs:
           rm -rf .repo
           rm -rf common
                                                                                     
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.2.0/clang-r584948.tar.gz"
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.4.1/clang-r584948.tar.gz"
           mkdir -p prebuilts/clang/host/linux-x86/clang-r584948
           tar -xzf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz -C prebuilts/clang/host/linux-x86/clang-r584948
           rm -rf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz
