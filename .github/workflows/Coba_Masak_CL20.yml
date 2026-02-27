@@ -44,7 +44,6 @@ on:
         default: "wildksu"
         options:
           - "kernelsu"
-          - "sukisu-ultra"
           - "wildksu"
       optimizationLevel:
         description: "Compiler optimization level"
@@ -82,6 +81,14 @@ on:
         required: false
         type: string
         default: "8"
+      LTOOptimizations:
+        description: "Choose LTO"
+        required: true
+        type: choice
+        default: "thin"
+        options:
+          - "thin"
+          - "full"
 
 jobs:
   Build-Kernel:
@@ -106,7 +113,7 @@ jobs:
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
-          sudo apt-get install -y repo rsync aria2
+          sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
       - name: 🔍 Check Space (Before Cleanup)
         run: |
@@ -349,8 +356,11 @@ jobs:
             echo "CONFIG_LOCALVERSION_AUTO=n\"" >> "$CONFIG_FILE"
           fi
           
-          # Basic optimizations
+          # Full Metamodule Support
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
+          echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
           
           # Extra TCP configs
           cat >> "$CONFIG_FILE" << 'EOF'
@@ -478,30 +488,6 @@ jobs:
           EOF
 
           echo "🎉 Official KernelSU"
-
-      - name: "🔧 Setup SukiSU-Ultra (Stable)"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          rm -rf ./KernelSU ./drivers/kernelsu
-          
-          # Install SukiSU-Ultra with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
-          
-          # Add KSU configs
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPM=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          EOF
-          
-          echo "✅ Installed SukiSU-Ultra"
           
       - name: "🔧 Setup Wild KSU with SUSFS"
         if: matrix.variant == 'ksu'
@@ -596,18 +582,11 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          LTO=full \
-          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
-          build/build.sh -j$(nproc --all)
-            
-      - name: "🩹 Apply KPM patch (SukiSU-Ultra only)"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
-        working-directory: ${{ env.WORK_DIR }}/out/dist
-        run: |
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-          chmod +x patch
-          ./patch
-          mv oImage Image
+          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          else
+           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          fi
 
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
@@ -671,7 +650,7 @@ jobs:
           if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
             KSU_INFO="_${{ github.event.inputs.ksuVariant }}"
           fi
-          ZIP_NAME="nefarian_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          ZIP_NAME="nefarian_cl20_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
