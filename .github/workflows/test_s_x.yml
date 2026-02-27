@@ -243,10 +243,10 @@ jobs:
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-          echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+          echo 'KBUILD_CFLAGS += $(call cc-disable-warning, default-const-init-unsafe)' >> Makefile
+          echo 'KBUILD_CFLAGS += $(call cc-disable-warning, uninitialized-const-pointer)' >> Makefile
           echo "Custom Makefile line added successfully"
-      
+          
       - name: "⚙️ Configure kernel optimization and tick rate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
