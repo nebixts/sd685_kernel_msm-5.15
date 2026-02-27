@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "zepharo"
+        default: "google"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,12 +27,12 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.9-Z-27022026"
+        default: "-NeFaRiaN-2.9-G-28022026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "both"
+        default: "ksu"
         options:
           - "noksu"
           - "ksu"
@@ -77,7 +77,7 @@ on:
         description: "Choose LTO"
         required: true
         type: choice
-        default: "full"
+        default: "thin"
         options:
           - "thin"
           - "full"
@@ -251,6 +251,15 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
+         
+          # Helper
+          apply_patch() {
+            local url="$1";
+            local file=$(basename "$url")
+            curl -L -o "$file" "$url"
+            patch -p1 < "$file" || echo "::warning::Hunks failed in $file"
+            rm -f "$file"
+          }
           
           # Remove any existing LTO FULL configuration
             sed -i '/^CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
