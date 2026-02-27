@@ -528,16 +528,22 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          make ${args} \
-            LLVM=1 \
-            LTO=thin \
+
+          make -j$(nproc) O=out \
+            ARCH=arm64 \
             CC=clang \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+            LD=ld.lld \
             AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
-            -j$(nproc --all)
-            
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip
+    
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
