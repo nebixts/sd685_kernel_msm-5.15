@@ -490,7 +490,6 @@ jobs:
           echo "🎉 Official KernelSU"
           
       - name: "🔧 Setup Wild KSU with SUSFS"
-            - name: "🔧 Setup Wild KSU with SUSFS"
         if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
