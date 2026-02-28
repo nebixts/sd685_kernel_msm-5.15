@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.8-G-27022026"
+        default: "-NeFaRiaN-2.8-G-01032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -221,10 +221,10 @@ jobs:
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
       
-      - name: 📐 Setup SWAP 24GB
+      - name: 📐 Setup SWAP 12GB
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 24
+            swap-size-gb: 12
 
       - name: "⚙️ Configure kernel optimization and tick rate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
