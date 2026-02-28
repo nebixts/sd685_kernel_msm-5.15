@@ -501,7 +501,7 @@ jobs:
           echo "✔ Wild KSU installed successfully"
           
           echo "📦 Cloning SUSFS4KSU..."
-          git clone --depth=1 https://gitlab.com -b gki-android13-5.15
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
           
           echo "🔧 Injecting SUSFS Source Files..."
           mkdir -p fs include/linux
