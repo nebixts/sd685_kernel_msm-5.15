@@ -515,8 +515,16 @@ jobs:
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
+          echo "🔧 Updating fs/Makefile to include SuSFS..."
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-\$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
+          fi
+
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          if [ -f "$KSU_PATCH" ]; then
+            patch -p1 -d KernelSU < "$KSU_PATCH" || echo "⚠️ KSU SuSFS patch failed"
+          fi
           
           echo "📄 Forcing SUSFS source injection..."
           
@@ -561,6 +569,7 @@ jobs:
           CONFIG_KPROBE_EVENTS=y
           CONFIG_OVERLAY_FS=y
           CONFIG_KSU_SUSFS=y
+          CONFIG_DEBUG_INFO_BTF=n
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
           CONFIG_KSU_SUSFS_SUS_MOUNT=y
