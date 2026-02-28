@@ -497,7 +497,7 @@ jobs:
           
           echo "📦 Installing Wild KSU..."
           # Install WildKSU
-          curl -LSs "https://raw.githubusercontent.com" | bash -s stable
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
           echo "✔ Wild KSU installed successfully"
           
           echo "📦 Cloning SUSFS4KSU..."
