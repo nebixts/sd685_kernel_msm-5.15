@@ -46,7 +46,8 @@ on:
           - "kernelsu"
           - "wildksu"
           - "next"
-          - "rksu"
+          - "resukisu"
+          - "wksu+susfs"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -374,7 +375,32 @@ jobs:
           CONFIG_TCP_CONG_BBR=y
           CONFIG_DEFAULT_WESTWOOD=y
           EOF
-
+          
+          # Networking Configuration
+          CONFIG_IP_NF_TARGET_TTL=y
+          CONFIG_IP6_NF_TARGET_HL=y
+          CONFIG_IP6_NF_MATCH_HL=y
+          
+          # IPSet Support
+          CONFIG_IP_SET=y
+          CONFIG_IP_SET_MAX=65534
+          CONFIG_IP_SET_BITMAP_IP=y
+          CONFIG_IP_SET_BITMAP_IPMAC=y
+          CONFIG_IP_SET_BITMAP_PORT=y
+          CONFIG_IP_SET_HASH_IP=y
+          CONFIG_IP_SET_HASH_IPMARK=y
+          CONFIG_IP_SET_HASH_IPPORT=y
+          CONFIG_IP_SET_HASH_IPPORTIP=y
+          CONFIG_IP_SET_HASH_IPPORTNET=y
+          CONFIG_IP_SET_HASH_IPMAC=y
+          CONFIG_IP_SET_HASH_MAC=y
+          CONFIG_IP_SET_HASH_NETPORTNET=y
+          CONFIG_IP_SET_HASH_NET=y
+          CONFIG_IP_SET_HASH_NETNET=y
+          CONFIG_IP_SET_HASH_NETPORT=y
+          CONFIG_IP_SET_HASH_NETIFACE=y
+          CONFIG_IP_SET_LIST_SET=y
+        
           # Script sign patch
           apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
           
@@ -492,7 +518,7 @@ jobs:
 
           echo "🎉 Official KernelSU"
           
-      - name: "🔧 Setup Wild KSU with SUSFS"
+      - name: "🔧 Setup Wild KSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -500,7 +526,7 @@ jobs:
           
           echo "📦 Installing Wild KSU..."
 
-          # Install WildKSU with SUSFS
+          # Install WildKSU
           curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
       
           echo "✔ Wild KSU installed successfully"
@@ -517,9 +543,9 @@ jobs:
           CONFIG_TMPFS_POSIX_ACL=y
           EOF
           
-          echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
+          echo "🎉 Wild KSU kernel patches fully integrated!"
             
-      - name: "🔧 Setup NEXT with SUSFS"
+      - name: "🔧 Setup NEXT"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -527,7 +553,7 @@ jobs:
           
           echo "📦 Installing NEXT..."
 
-          # Install NEXT with SUSFS
+          # Install NEXT
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           echo "✔ NEXT installed successfully"
           
@@ -543,35 +569,90 @@ jobs:
           CONFIG_TMPFS_POSIX_ACL=y
           EOF
           
-          echo "🎉 NEXT with SUSFS kernel patches fully integrated"
+          echo "🎉 NEXT kernel patches fully integrated"
           
-      - name: "🔧 Setup rKSU"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'rksu'
+      - name: "🔧 Setup ReSukisu"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'resukisu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
           
-          # Install rKSU
-          curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s susfs-rksu-master
+          echo "📦 Installing ReSukisu..."
 
-          # Apply SUSFS patch
-          PATCH_URL="https://api.github.com/repos/nebixts/kernel_patches/releases/latest"
-          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
-          
-          if [ -n "$SUSFS_PATCH" ]; then
-            curl -L -o susfs.patch "$SUSFS_PATCH"
-            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
-          fi
-
-          # Apply syscall hooks
-          curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.6.patch"
-          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
+          # Install ReSukisu
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          echo "✔ ReSukisu installed successfully"
           
           # Add KSU configs
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KSU_MANUAL_HOOK=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          CONFIG_OVERLAY_FS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          EOF
+          
+          echo "🎉 ReSukisu kernel patches fully integrated"
+          
+      - name: "🔧 Setup Wild KSU with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wksu+susfs'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          rm -rf ./KernelSU ./drivers/kernelsu
+          
+          echo "📦 Installing Wild KSU..."
+
+          # Install WildKSU with SUSFS
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
+      
+          echo "✔ Wild KSU installed successfully"
+          
+          # Clone SUSFS4KSU for kernel patches only (not KSU integration)
+          echo "📦 Cloning SUSFS4KSU for kernel patches..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+          
+          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          
+          echo "🔧 Applying SUSFS kernel patch..."
+          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+            echo "✅ SUSFS patch successfully applied"
+          else
+            echo "⚠️ SUSFS patch failed — copying files manually"
+          fi
+
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          
+          echo "📄 Forcing SUSFS source injection..."
+          
+          # Always replace fs/susfs.c
+          mkdir -p fs
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+          echo "✔ Copied fs/susfs.c"
+          
+          # Always replace include/linux/susfs.h
+          mkdir -p include/linux
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          echo "✔ Copied include/linux/susfs.h"
+          
+          # Also install missing susfs_def.h
+          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
+            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+            echo "✔ Copied include/linux/susfs_def.h"
+          else
+            echo "⚠️ susfs_def.h not found in repo"
+          fi
+          
+          # Add Wild KSU configs with SUSFS
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -579,7 +660,6 @@ jobs:
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
           CONFIG_KSU_SUSFS_TRY_UMOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
@@ -588,13 +668,10 @@ jobs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_KPROBES=n
           EOF
           
-          echo "✅ Installed rKSU"
-          
+          echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
+                   
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
@@ -603,7 +680,16 @@ jobs:
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
-            
+          
+      - name: "🩹 Apply KPM patch (ReSukisu only)"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'resukisu'
+        working-directory: ${{ env.WORK_DIR }}/out/dist
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod +x patch
+          ./patch
+          mv oImage Image
+  
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
