@@ -559,13 +559,13 @@ jobs:
 
           # Apply SUSFS v2.0.0 (Hybrid Mode)
           run: |
-            git clone https://gitlab.com -b gki-android13-5.15 susfs
+            git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
             cd kernel
             cp ../susfs/kernel_patches/fs/susfs.c fs/
             cp ../susfs/kernel_patches/include/linux/susfs.h include/linux/
             git apply ../susfs/kernel_patches/5.15/0001-susfs-v2.0.0-hybrid.patch
           
-          # Add Wild KSU configs with SUSFS
+          # Add NEXT configs with SUSFS
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
