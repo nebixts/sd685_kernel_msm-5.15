@@ -527,7 +527,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Install WildKSU
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
       
           echo "✔ Wild KSU installed successfully"
           
@@ -554,7 +554,7 @@ jobs:
           echo "📦 Installing NEXT..."
 
           # Install NEXT
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
           echo "✔ NEXT installed successfully"
 
           # Apply SUSFS v2.0.0 (Hybrid Mode)
