@@ -190,7 +190,6 @@ jobs:
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
       - name: "📥 Initialize repo"
-        if: github.event.inputs.buildToolchains == 'android-tools'
         working-directory: ${{ env.WORK_DIR}}
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
@@ -198,20 +197,24 @@ jobs:
           
           rm -rf .repo
           rm -rf common
+                                                                                    
+          # Download and extract ZyCromerZ Clang 15.0.7
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/Clang-15.0.7.tar.gz "https://github.com/ZyCromerZ/Clang/releases/download/15.0.7-20260208-release/Clang-15.0.7-20260208.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-zycz
+          tar -xzf prebuilts/clang/host/linux-x86/Clang-15.0.7.tar.gz -C prebuilts/clang/host/linux-x86/clang-zycz
+          rm -rf prebuilts/clang/host/linux-x86/Clang-15.0.7.tar.gz
 
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.4.2/clang-r584948.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r584948
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
-          rm -rf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz
-
+          # Cleanup existing Clang dirs
+          rm -rf prebuilts/clang/host/linux-x86/clang-r584948b
           rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
-          
+         
+          # Update build constants to point to the new directory/version
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r584948/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=clang-zycz/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
           sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -228,7 +231,7 @@ jobs:
            -e '/^MODULES_ORDER=/d' \
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-           
+
       - name: "💫 Get Toolchains"
         if: github.event.inputs.buildToolchains == 'custom-tools'
         run: |
