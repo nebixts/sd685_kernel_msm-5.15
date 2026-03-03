@@ -109,6 +109,67 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
+      - name: 🔍 Check Space (Before Cleanup)
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+
+      - name: 🧹 Aggressive Cleanup
+        run: |
+          # Remove heavy pre-installed tools
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          
+          # Prune Docker to remove hidden images and build cache
+          sudo docker image prune --all --force
+          sudo docker builder prune -a -f
+
+      - name: 🔍 Check Space (After Cleanup)
+        run: |
+          echo "Disk space after cleanup:"
+          df -h /
+      - name: "🧰 Setup swapfile (optional)"
+        # swap creation happens early so build processes can use it
+        run: |
+          SWAP_GB="${{ github.event.inputs.swapSizeGB }}"
+          # Normalize empty input to 0
+          if [ -z "$SWAP_GB" ]; then
+            SWAP_GB=0
+          fi
+
+          if [ "$SWAP_GB" != "0" ]; then
+            echo "Requested swap: ${SWAP_GB}G"
+            # If /swapfile exists, try to remove it first to avoid conflicts
+            if [ -f /swapfile ]; then
+              echo "Existing /swapfile found, disabling and removing..."
+              sudo swapoff /swapfile || true
+              sudo rm -f /swapfile
+            fi
+
+            # Try to create swap with fallocate for speed; fallback to dd
+            if command -v fallocate >/dev/null 2>&1; then
+              echo "Creating swapfile with fallocate..."
+              sudo fallocate -l ${SWAP_GB}G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_GB * 1024))
+            else
+              echo "fallocate not available, creating swapfile with dd..."
+              sudo dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_GB * 1024))
+            fi
+
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            # Reduce swappiness so system prefers RAM but can use swap when needed
+            sudo sysctl -w vm.swappiness=10 || true
+
+            echo "SWAP_CREATED=true" >> $GITHUB_ENV
+            echo "/swapfile created and activated (size: ${SWAP_GB}G)"
+          else
+            echo "No swap requested (swapSizeGB=${SWAP_GB})"
+          fi   
+          
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -130,6 +191,7 @@ jobs:
           tar -xzf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz
 
+          rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
@@ -172,7 +234,7 @@ jobs:
             printf "%s" "$latest_url"  # Use printf to output only the URL
           }
       
-          clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
+          clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
       
           echo "✅ Clang URL: $clang_url"
       
@@ -224,24 +286,11 @@ jobs:
       
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"
-      
-      - name: 📐 Setup SWAP 10GB
-        if: github.event.inputs.buildToolchains == 'android-tools'
-        uses: pierotofy/set-swap-space@master
-        with:
-            swap-size-gb: 10
 
-      - name: 📐 Setup SWAP 20GB
-        if: github.event.inputs.buildToolchains == 'custom-tools'
+      - name: 📐 Setup SWAP 24GB
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 20
-            
-      - name: 📐 Tune Swap
-        if: github.event.inputs.buildToolchains == 'custom-tools'
-        run: |
-            echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
-            sudo sysctl -p
+            swap-size-gb: 24
             
       - name: "😎 Set args for GKI kernels"
         if: github.event.inputs.buildToolchains == 'custom-tools'
@@ -453,95 +502,32 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
             
-      - name: "🔧 Setup Wild KSU with SUSFS"
-        if: matrix.variant == 'ksu'
+      - name: "🔧 Setup NEXT"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
           
-          echo "📦 Installing Wild KSU..."
+          echo "📦 Installing NEXT..."
 
-          # Install WildKSU with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
-      
-          echo "✔ Wild KSU installed successfully"
-          
-          # Clone SUSFS4KSU for kernel patches only (not KSU integration)
-          echo "📦 Cloning SUSFS4KSU for kernel patches..."
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-          
-          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          echo "🔧 Applying SUSFS kernel patch..."
-          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
-            echo "✅ SUSFS patch successfully applied"
-          else
-            echo "⚠️ SUSFS patch failed — copying files manually"
-          fi
+          # Install NEXT
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
+          echo "✔ NEXT installed successfully"
 
-          echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          
-          echo "📄 Forcing SUSFS source injection..."
-          
-          # Always replace fs/susfs.c
-          mkdir -p fs
-          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          echo "✔ Copied fs/susfs.c"
-          
-          # Always replace include/linux/susfs.h
-          mkdir -p include/linux
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          echo "✔ Copied include/linux/susfs.h"
-          
-          # Also install missing susfs_def.h
-          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "✔ Copied include/linux/susfs_def.h"
-          else
-            echo "⚠️ susfs_def.h not found in repo"
-          fi
-          
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
-          
-          # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
-          rm -rf susfs4ksu
-          
-          # Create symbolic link for drivers/kernelsu (if needed by build system)
-          if [ ! -L "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
-            echo "✔ Created drivers/kernelsu symlink"
-          fi
-          
-          # Add Wild KSU configs with SUSFS
+          # Add KSU configs
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
+          CONFIG_OVERLAY_FS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
           EOF
           
-          echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
-
+          echo "🎉 NEXT kernel patches fully integrated"
+          
       - name: "🔨 Build kernel"
         if: github.event.inputs.buildToolchains == 'android-tools'
         working-directory: ${{ env.WORK_DIR }}
