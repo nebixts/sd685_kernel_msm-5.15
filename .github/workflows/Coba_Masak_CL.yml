@@ -37,6 +37,14 @@ on:
           - "noksu"
           - "ksu"
           - "both"
+      ksuVariant:
+        description: "KSU implementation (if KSU enabled)"
+        required: true
+        type: choice
+        default: "next"
+        options:
+          - "next"
+          - "wildksu"
       tickRate:
         description: "Kernel tick rate (Hz)"
         required: false
@@ -538,7 +546,34 @@ jobs:
           EOF
           
           echo "🎉 NEXT kernel patches fully integrated"
+
+      - name: "🔧 Setup Wild KSU"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          rm -rf ./KernelSU ./drivers/kernelsu
           
+          echo "📦 Installing Wild KSU..."
+
+          # Install WildKSU
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+      
+          echo "✔ Wild KSU installed successfully"
+          
+          # Add KSU configs
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          CONFIG_OVERLAY_FS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          EOF
+          
+          echo "🎉 Wild KSU kernel patches fully integrated!"
+            
       - name: "🔨 Build kernel"
         if: github.event.inputs.buildToolchains == 'android-tools'
         working-directory: ${{ env.WORK_DIR }}
