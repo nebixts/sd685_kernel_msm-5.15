@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-Z-04032026"
+        default: "-NeFaRiaN-3.0-Z-05032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -41,7 +41,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "next"
+        default: "next+susfs"
         options:
           - "kernelsu"
           - "wildksu"
@@ -243,9 +243,6 @@ jobs:
             patch -p1 < "$file" || echo "::warning::Hunks failed in $file"
             rm -f "$file"
           }
-
-          # custom tickrate options patch
-          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
           
           # Remove existing optimization configs
           sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
@@ -274,7 +271,10 @@ jobs:
               echo "CONFIG_CC_OPTIMIZE_FOR_SIZE=y" >> "$CONFIG_FILE"
               ;;
           esac
-         
+        
+          # custom tickrate options patch
+          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
+          
           # Apply selected tick rate
           case "${{ github.event.inputs.tickRate }}" in
           default)
@@ -412,6 +412,10 @@ jobs:
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
           echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
+          echo "✅ Applied Full Meta Module Support"
+          echo "✅ Applied Extra TCP configs"
+          echo "✅ Applied Networking Configuration"
+          echo "✅ Applied IPSet Support"
 
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
@@ -606,8 +610,14 @@ jobs:
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
-          echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          if patch -p1 < "$KSU_PATCH"; then
+            echo "✅ KSU_PATCH patch successfully applied"
+          else
+            echo "⚠️ KSU_PATCH patch failed — copying files manually"
+          fi
           
           echo "📄 Forcing SUSFS source injection..."
           
@@ -622,12 +632,9 @@ jobs:
           echo "✔ Copied include/linux/susfs.h"
           
           # Also install missing susfs_def.h
-          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "✔ Copied include/linux/susfs_def.h"
-          else
-            echo "⚠️ susfs_def.h not found in repo"
-          fi
+          mkdir -p 
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+          echo "✔ Copied include/linux/susfs_def.h"
           
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
@@ -663,14 +670,7 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
-          
-          #CONFIG_KPROBES=n
-          #CONFIG_HAVE_KPROBES=n
-          #CONFIG_KPROBE_EVENTS=n
-          #CONFIG_KSU_KPROBES_HOOK=n
           
           echo "🎉 NEXT with SUSFS kernel patches fully integrated!"
           
