@@ -195,7 +195,7 @@ jobs:
           rm -rf .repo
           rm -rf common
                                                                                     
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.4.2/clang-r584948.tar.gz"
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.5.1/clang-r584948.tar.gz"
           mkdir -p prebuilts/clang/host/linux-x86/clang-r584948
           tar -xzf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz -C prebuilts/clang/host/linux-x86/clang-r584948
           rm -rf prebuilts/clang/host/linux-x86/clang-r584948.tar.gz
@@ -646,10 +646,6 @@ jobs:
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_KSU_KPROBES_HOOK=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -670,6 +666,11 @@ jobs:
           CONFIG_TMPFS_POSIX_ACL=y
           CONFIG_KSU=y
           EOF
+          
+          #CONFIG_KPROBES=n
+          #CONFIG_HAVE_KPROBES=n
+          #CONFIG_KPROBE_EVENTS=n
+          #CONFIG_KSU_KPROBES_HOOK=n
           
           echo "🎉 NEXT with SUSFS kernel patches fully integrated!"
           
