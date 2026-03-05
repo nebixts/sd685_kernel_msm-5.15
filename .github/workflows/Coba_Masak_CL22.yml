@@ -44,10 +44,11 @@ on:
         default: "next+susfs"
         options:
           - "kernelsu"
+          - "kernelsu+susfs"
           - "wildksu"
+          - "wksu+susfs"
           - "next"
           - "next+susfs"
-          - "wksu+susfs"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -435,6 +436,31 @@ jobs:
           echo "📦 Installing official KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
+          echo "✔ KernelSU installed successfully"
+          
+          # Add KSU configs
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          CONFIG_KSU_KPROBES_HOOK=y
+          EOF
+          
+          echo "🎉 KernelSU kernel patches fully integrated!"
+            
+      - name: "🔧 Setup KernelSU+SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu+susfs'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          rm -rf ./KernelSU ./drivers/kernelsu
+
+          echo "📦 Installing official KernelSU..."
+          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+
+          echo "✔ KernelSU installed successfully"
+          
           echo "📦 Cloning SUSFS4KSU..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
@@ -504,10 +530,6 @@ jobs:
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_KSU_KPROBES_HOOK=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -524,11 +546,9 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
 
-          echo "🎉 Official KernelSU"
+          echo "🎉 Official KernelSU kernel patches fully integrated"
           
       - name: "🔧 Setup Wild KSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
@@ -551,9 +571,6 @@ jobs:
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_KPROBES_HOOK=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
           
           echo "🎉 Wild KSU kernel patches fully integrated!"
@@ -578,9 +595,6 @@ jobs:
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_KPROBES_HOOK=y
-          CONFIG_OVERLAY_FS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
           
           echo "🎉 NEXT kernel patches fully integrated"
@@ -597,6 +611,7 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
           echo "✔ NEXT installed successfully"
 
+          
           # Clone SUSFS4KSU for kernel patches only (not KSU integration)
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
@@ -609,7 +624,7 @@ jobs:
           else
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
-          
+
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           
@@ -626,9 +641,17 @@ jobs:
           echo "✔ Copied include/linux/susfs.h"
           
           # Also install missing susfs_def.h
-          mkdir -p 
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-          echo "✔ Copied include/linux/susfs_def.h"
+          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
+            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+            echo "✔ Copied include/linux/susfs_def.h"
+          else
+            echo "⚠️ susfs_def.h not found in repo"
+          fi
+          
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
           
           # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
           rm -rf susfs4ksu
@@ -672,7 +695,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Install WildKSU with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
       
           echo "✔ Wild KSU installed successfully"
           
@@ -746,14 +769,7 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
           EOF
-          
-          #CONFIG_KPROBES=n
-          #CONFIG_HAVE_KPROBES=n
-          #CONFIG_KPROBE_EVENTS=n
-          #CONFIG_KSU_KPROBES_HOOK=n
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
                    
@@ -765,15 +781,6 @@ jobs:
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
-          
-      - name: "🩹 Apply KPM patch (ReSukisu only)"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'resukisu'
-        working-directory: ${{ env.WORK_DIR }}/out/dist
-        run: |
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-          chmod +x patch
-          ./patch
-          mv oImage Image
   
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
@@ -850,32 +857,3 @@ jobs:
           name: ${{ env.ZIP_NAME }}
           path: ${{ env.ZIP_PATH }}
           retention-days: 7
-
-      - name: "📱 Send to Telegram"
-        if: always()
-        run: |
-          if [[ -f "${{ env.ZIP_PATH }}" ]]; then
-            KSU_TEXT="";
-            if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
-              KSU_TEXT="
-          KSU Variant: ${{ github.event.inputs.ksuVariant }}";
-            fi
-            
-            CAPTION="✅ Kernel Build Complete
-          Branch: ${{ github.event.inputs.kernelBranch }}
-          Optimization: -${{ github.event.inputs.optimizationLevel }}
-          Tick Rate: ${{ github.event.inputs.tickRate }}Hz
-          Variants: ${{ github.event.inputs.buildKSU }}${KSU_TEXT}
-          Time: $(date '+%Y-%m-%d %H:%M:%S')"
-            
-            curl -s -F document=@"${{ env.ZIP_PATH }}" \
-                 -F caption="$CAPTION" \
-                 -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-                 "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument";
-          else
-            curl -s -X POST \
-                 -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-                 -d text="❌ Kernel build failed - Optimization: -${{ github.event.inputs.optimizationLevel }}, Tick: ${{ github.event.inputs.tickRate }}Hz" \
-                 "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage";
-          fi
-
