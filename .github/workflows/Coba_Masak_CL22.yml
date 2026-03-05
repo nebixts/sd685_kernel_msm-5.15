@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-Z-05032026"
+        default: "-NeFaRiaN-2.9-Z-05032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -369,9 +369,9 @@ jobs:
           # Extra TCP configs
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_TCP_CONG_ADVANCED=y
-          CONFIG_TCP_CONG_BIC=n
+          CONFIG_TCP_CONG_BIC=y
           CONFIG_TCP_CONG_WESTWOOD=y
-          CONFIG_TCP_CONG_HTCP=n
+          CONFIG_TCP_CONG_HTCP=y
           CONFIG_TCP_CONG_BBR=y
           CONFIG_DEFAULT_WESTWOOD=y
           CONFIG_NET_SCH_FQ=y
@@ -609,15 +609,9 @@ jobs:
           else
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
-
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          if patch -p1 < "$KSU_PATCH"; then
-            echo "✅ KSU_PATCH patch successfully applied"
-          else
-            echo "⚠️ KSU_PATCH patch failed — copying files manually"
-          fi
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           
           echo "📄 Forcing SUSFS source injection..."
           
@@ -635,11 +629,6 @@ jobs:
           mkdir -p 
           cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
           echo "✔ Copied include/linux/susfs_def.h"
-          
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
           
           # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
           rm -rf susfs4ksu
