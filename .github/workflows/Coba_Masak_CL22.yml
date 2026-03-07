@@ -706,14 +706,22 @@ jobs:
           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
 
           # 4. Apply Kernel Patches (Common/Root directory)
+          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
           echo "🔧 Applying SUSFS kernel patch..."
-          patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || echo "⚠️ Kernel patch failed"
-
+          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+            echo "✅ SUSFS patch successfully applied"
+          else
+            echo "⚠️ SUSFS patch failed — copying files manually"
+          fi
+          
           # 5. Apply KSU-specific SUSFS patch (CRITICAL: Must be in KernelSU directory)
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          cd KernelSU
-          patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
-          cd ..
+          if patch -p1 < "$KSU_PATCH"; then
+          echo "✅ KSU patch successfully applied"
+          else
+            echo "⚠️ KSU patch failed — copying files manually"
+          fi
 
           # 6. Apply CodeLinaro/GKI Configs
           # Note: Ensure you are targeting the correct defconfig for your build
