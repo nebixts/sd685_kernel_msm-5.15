@@ -715,13 +715,8 @@ jobs:
           fi
           
           # 5. Apply KSU-specific SUSFS patch (CRITICAL: Must be in KernelSU directory)
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          if patch -p1 < "$KSU_PATCH"; then
-          echo "✅ KSU patch successfully applied"
-          else
-            echo "⚠️ KSU patch failed — copying files manually"
-          fi
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
 
           # 6. Apply CodeLinaro/GKI Configs
           # Note: Ensure you are targeting the correct defconfig for your build
@@ -749,7 +744,7 @@ jobs:
 
           # 7. Cleanup
           rm -rf susfs4ksu
-          echo "🎉 GKI Integration complete!"
+          echo "🎉 NEXT with SUSFS Patched fully Integration complete!"
 
           
       - name: "🔨 Build kernel"
