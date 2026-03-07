@@ -695,17 +695,7 @@ jobs:
           echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
-          # 2. Identify the correct KSU directory
-          if [ -d "KernelSU" ]; then
-          KSU_DIR="KernelSU"
-          elif [ -d "drivers/kernelsu" ]; then
-          KSU_DIR="drivers/kernelsu"
-          else
-          echo "❌ KernelSU directory not found!" && exit 1
-          fi
-          echo "Found KSU directory at: $KSU_DIR"
-          
-          # 2b. Clone the official SUSFS repository for GKI 13-5.15
+          # 2. Clone the official SUSFS repository for GKI 13-5.15
           echo "📦 Cloning SUSFS4KSU..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
     
@@ -724,9 +714,16 @@ jobs:
           # 5. Apply KSU-specific SUSFS patch (CRITICAL: Targets KernelSU folder)
           # Without this, the KernelSU Manager will NOT see or be able to toggle SUSFS.
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          cd "$KSU_DIR"
-          patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
-          cd ..
+          KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+
+          # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
+          rm -rf susfs4ksu
+          
+          # Create symbolic link for drivers/kernelsu (if needed by build system)
+          if [ ! -L "drivers/kernelsu" ]; then
+            ln -sf ../KernelSU drivers/kernelsu
+            echo "✔ Created drivers/kernelsu symlink"
+          fi
           
           # 6. Apply Defconfig for GKI/CodeLinaro
           # Ensure these flags are appended to your specific config file.
@@ -752,8 +749,6 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
 
-          # 7. Cleanup the temporary repo
-          rm -rf susfs4ksu
           echo "🎉 NEXT with SUSFS Integration complete!"
 
       - name: "🔨 Build kernel"
