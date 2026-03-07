@@ -693,11 +693,11 @@ jobs:
           # 1. Clean and Install KernelSU-Next
           rm -rf ./KernelSU ./drivers/kernelsu
           echo "📦 Installing NEXT..."
-          curl -LSs "https://raw.githubusercontent.com" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
 
           # 2. Clone SUSFS repository (GKI-specific branch)
           echo "📦 Cloning SUSFS4KSU..."
-          git clone --depth=1 https://gitlab.com -b gki-android13-5.15
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
     
           # 3. Copy core SUSFS files to kernel tree
           # For GKI, these usually go into the 'common/' or root fs/include dirs
