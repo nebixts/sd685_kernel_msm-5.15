@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "codelinaro"
+        default: "google"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,12 +27,12 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-C-08032026"
+        default: "-NeFaRiaN-3.0-G-08032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "both"
+        default: "ksu"
         options:
           - "noksu"
           - "ksu"
@@ -686,18 +686,18 @@ jobs:
           
           echo "🎉 NEXT kernel patches fully integrated"
         
-      - name: "🔧 Setup NEXT with SUSFS (GKI/CodeLinaro)"
+      - name: "🔧 Setup NEXT with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next+susfs'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           # 1. Install KernelSU-Next using the official remote script
           rm -rf ./KernelSU ./drivers/kernelsu
           echo "📦 Installing NEXT..."
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
           # 2. Clone the official SUSFS repository for GKI 13-5.15
           echo "📦 Cloning SUSFS4KSU..."
-          git clone --depth=1 https://gitlab.com -b gki-android13-5.15
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
     
           # 3. Inject SUSFS source files to the KERNEL root
           # URL context: https://gitlab.com
@@ -744,7 +744,7 @@ jobs:
 
           # 7. Cleanup the temporary repo
           rm -rf susfs4ksu
-          echo "🎉 NEXT with SUSFS (GKI/CodeLinaro) Integration complete!"
+          echo "🎉 NEXT with SUSFS Integration complete!"
 
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
