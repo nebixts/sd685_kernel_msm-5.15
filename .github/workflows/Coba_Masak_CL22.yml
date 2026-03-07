@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "zepharo"
+        default: "codelinaro"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,12 +27,12 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.9-Z-05032026"
+        default: "-NeFaRiaN-3.0-C-07032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "ksu"
+        default: "both"
         options:
           - "noksu"
           - "ksu"
@@ -693,7 +693,7 @@ jobs:
           # 1. Clean and Install KernelSU-Next
           rm -rf ./KernelSU ./drivers/kernelsu
           echo "📦 Installing NEXT..."
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
           # 2. Clone SUSFS repository (GKI-specific branch)
           echo "📦 Cloning SUSFS4KSU..."
