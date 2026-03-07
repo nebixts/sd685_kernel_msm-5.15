@@ -714,9 +714,7 @@ jobs:
           # 5. Apply KSU-specific SUSFS patch (CRITICAL: Targets KernelSU folder)
           # Without this, the KernelSU Manager will NOT see or be able to toggle SUSFS.
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          cd KernelSU
-          patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
-          cd ..
+          patch -p1 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
 
           # 6. Apply Defconfig for GKI/CodeLinaro
           # Ensure these flags are appended to your specific config file.
