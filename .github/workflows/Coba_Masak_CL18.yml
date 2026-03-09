@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-1.1-SnS-06032026"
+        default: "-NeFaRiaN-1.1-G-09032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -62,7 +62,7 @@ on:
         description: "Kernel tick rate (Hz)"
         required: false
         type: choice
-        default: "250"
+        default: "500"
         options:
           - "default"
           - "100"
@@ -362,6 +362,7 @@ jobs:
           
           # Full Metamodule Support
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_KALLSYMS_ALL=y >> $CONFIG_FILE"
           echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
           echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
@@ -772,7 +773,7 @@ jobs:
           
           echo "🎉 NEXT with SUSFS kernel patches fully integrated!"
           
-      - name: "🔨 Build kernel"
+      - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
