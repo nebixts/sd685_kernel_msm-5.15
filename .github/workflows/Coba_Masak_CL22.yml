@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-G-08032026"
+        default: "-NeFaRiaN-3.0-G-09032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -96,7 +96,7 @@ on:
 
 jobs:
   Build-Kernel:
-    name: "🚀 Build Kernel"
+    name: "🚀 Preparation Build Kernel"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -112,19 +112,19 @@ jobs:
       WORK_DIR: ${{ github.workspace }}
 
     steps:
-      - name: "✨ Setup workspace"
+      - name: "✨ Setup WorkSpace"
         run: |
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
-      - name: 🔍 Check Space (Before Cleanup)
+      - name: 🔍 Check Space (Before CleanUp)
         run: |
           echo "Disk space before cleanup:"
           df -h /
 
-      - name: 🧹 Aggressive Cleanup
+      - name: 🧹 Aggressive CleanUp
         run: |
           # Remove heavy pre-installed tools
           sudo rm -rf /usr/share/dotnet
@@ -142,7 +142,7 @@ jobs:
           echo "Disk space after cleanup:"
           df -h /
 
-      - name: "🧰 Setup swapfile (optional)"
+      - name: "🧰 Setup Swapfile (optional)"
         # swap creation happens early so build processes can use it
         run: |
           SWAP_GB="${{ github.event.inputs.swapSizeGB }}"
@@ -181,13 +181,13 @@ jobs:
             echo "No swap requested (swapSizeGB=${SWAP_GB})"
           fi
 
-      - name: "🌟 Clone kernel source"
+      - name: "🌟 Clone Kernel Source"
         working-directory: ./${{ env.kernelDir }}
         run: |
           git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
-      - name: "📥 Initialize repo"
+      - name: "📥 Initialize Repo ToolChain"
         working-directory: ${{ env.WORK_DIR}}
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
@@ -226,12 +226,12 @@ jobs:
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
    
-      - name: 📐 Setup SWAP 24GB
+      - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
         with:
             swap-size-gb: 24
 
-      - name: "⚙️ Configure kernel optimization and tick rate"
+      - name: "⚙️ Configure Kernel Optimization and TickRate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
@@ -427,13 +427,13 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
-      - name: "🔧 Setup Official KernelSU"
+      - name: "🔧 Setup KernelSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
 
-          echo "📦 Installing official KernelSU..."
+          echo "📦 Installing KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
           echo "✔ KernelSU installed successfully"
@@ -448,7 +448,7 @@ jobs:
           CONFIG_KSU_KPROBES_HOOK=y
           EOF
           
-          echo "🎉 Official KernelSU kernel patches fully integrated"
+          echo "🎉 KernelSU kernel patches fully integrated"
             
       - name: "🔧 Setup KernelSU+SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu+susfs'
@@ -456,7 +456,7 @@ jobs:
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
 
-          echo "📦 Installing official KernelSU..."
+          echo "📦 Installing KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
           echo "✔ KernelSU installed successfully"
@@ -548,7 +548,7 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
 
-          echo "🎉 Official KernelSU kernel patches fully integrated"
+          echo "🎉 KernelSU kernel patches fully integrated"
           
       - name: "🔧 Setup Wild KSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
@@ -690,32 +690,57 @@ jobs:
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next+susfs'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          # 1. Install KernelSU-Next using the official remote script
+          # Install KernelSU-Next using the official remote script
           rm -rf ./KernelSU ./drivers/kernelsu
           echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
-          # 2. Clone the official SUSFS repository for GKI 13-5.15
+          # Clone the official SUSFS repository for GKI 13-5.15
           echo "📦 Cloning SUSFS4KSU..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
     
-          # 3. Inject SUSFS source files to the KERNEL root
-          # URL context: https://gitlab.com
+          # Inject SUSFS source files to the KERNEL root
           echo "📄 Injecting SUSFS source files..."
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
 
-          # 4. Apply Kernel-level Patch (Targets the main kernel tree)
-          # This enables the low-level hooks required for SUSFS to function.
+          # Apply Kernel-level Patch (Targets the main kernel tree)
           echo "🔧 Applying SUSFS kernel patch..."
           patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || echo "⚠️ Kernel patch failed"
 
-          # 5. Apply KSU-specific SUSFS patch (CRITICAL: Targets KernelSU folder)
-          # Without this, the KernelSU Manager will NOT see or be able to toggle SUSFS.
+          echo "📦 Injecting SUSFS -> KernelSU integration files"
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
+          fi
+          
+          # Apply KSU-specific SUSFS patch (CRITICAL: Targets KernelSU folder)
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+         
+          if [ -f "$KSU_PATCH" ]; then
+            cd KernelSU
+            if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
+              patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
+              cd ..
+            else
+              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
+              cd ..
+              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+            fi
+          else
+            echo "⚠️ KSU patch missing — manually injecting changes"
+            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+          fi
 
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
+          
           # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
           rm -rf susfs4ksu
           
@@ -725,8 +750,7 @@ jobs:
             echo "✔ Created drivers/kernelsu symlink"
           fi
           
-          # 6. Apply Defconfig for GKI/CodeLinaro
-          # Ensure these flags are appended to your specific config file.
+          # Add KSU/KSUN/WKSU configs with SUSFS
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
@@ -751,7 +775,7 @@ jobs:
 
           echo "🎉 NEXT with SUSFS Integration complete!"
 
-      - name: "🔨 Build kernel"
+      - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
