@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: string
-        default: "zepharo"
+        default: "google"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-2.9-Z-05032026"
+        default: "-NeFaRiaN-3.0-G-10032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -41,7 +41,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "next+susfs"
+        default: "wildksu+susfs"
         options:
           - "kernelsu"
           - "kernelsu+susfs"
@@ -362,6 +362,7 @@ jobs:
           
           # Full Metamodule Support
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_KALLSYMS_ALL=y >> $CONFIG_FILE"
           echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
           echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
@@ -426,13 +427,13 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
-      - name: "🔧 Setup Official KernelSU"
+      - name: "🔧 Setup KernelSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
 
-          echo "📦 Installing official KernelSU..."
+          echo "📦 Installing KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
           echo "✔ KernelSU installed successfully"
@@ -447,7 +448,7 @@ jobs:
           CONFIG_KSU_KPROBES_HOOK=y
           EOF
           
-          echo "🎉 Official KernelSU kernel patches fully integrated"
+          echo "🎉 KernelSU kernel patches fully integrated"
             
       - name: "🔧 Setup KernelSU+SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu+susfs'
@@ -455,7 +456,7 @@ jobs:
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
 
-          echo "📦 Installing official KernelSU..."
+          echo "📦 Installing KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
           echo "✔ KernelSU installed successfully"
@@ -547,20 +548,20 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
 
-          echo "🎉 Official KernelSU kernel patches fully integrated"
+          echo "🎉 KernelSU kernel patches fully integrated"
           
-      - name: "🔧 Setup Wild KSU"
+      - name: "🔧 Setup WildKSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
           
-          echo "📦 Installing Wild KSU..."
+          echo "📦 Installing WildKSU..."
 
           # Install WildKSU
           curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
       
-          echo "✔ Wild KSU installed successfully"
+          echo "✔ WildKSU installed successfully"
           
           # Add KSU configs
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
@@ -574,13 +575,13 @@ jobs:
           
           echo "🎉 Wild KSU kernel patches fully integrated!"
 
-      - name: "🔧 Setup Wild KSU with SUSFS"
+      - name: "🔧 Setup WildKSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu+susfs'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
           
-          echo "📦 Installing Wild KSU..."
+          echo "📦 Installing WildKSU..."
 
           # Install WildKSU with SUSFS
           curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
@@ -659,7 +660,7 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
           
-          echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
+          echo "🎉 WildKSU with SUSFS kernel patches fully integrated!"
                    
       - name: "🔧 Setup NEXT"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'next'
@@ -670,7 +671,8 @@ jobs:
           echo "📦 Installing NEXT..."
 
           # Install NEXT
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
+
           echo "✔ NEXT installed successfully"
 
           # Add KSU configs
@@ -772,7 +774,7 @@ jobs:
           
           echo "🎉 NEXT with SUSFS kernel patches fully integrated!"
           
-      - name: "🔨 Build kernel"
+      - name: "🔨 START Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
