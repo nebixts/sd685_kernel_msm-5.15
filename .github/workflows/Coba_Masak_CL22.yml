@@ -96,7 +96,7 @@ on:
 
 jobs:
   Build-Kernel:
-    name: "🚀 Preparation Build Kernel"
+    name: "🚀 Build Kernel"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -361,8 +361,9 @@ jobs:
             echo "CONFIG_LOCALVERSION_AUTO=n\"" >> "$CONFIG_FILE"
           fi
           
-          # Full Metamodule Support
+          # Full Metamodule + KP NEXT Support
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
+          echo "CONFIG_KALLSYMS_ALL=y >> $CONFIG_FILE"
           echo "CONFIG_TMPFS_XATTR=y" >> "$CONFIG_FILE"
           echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$CONFIG_FILE"
           echo "CONFIG_OVERLAY_FS=y" >> "$CONFIG_FILE"
@@ -718,24 +719,7 @@ jobs:
           # Apply KSU-specific SUSFS patch (CRITICAL: Targets KernelSU folder)
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
-         
-          if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU
-            if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
-              patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
-              cd ..
-            else
-              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
-              cd ..
-              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
-            fi
-          else
-            echo "⚠️ KSU patch missing — manually injecting changes"
-            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
-          fi
-
+          
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
