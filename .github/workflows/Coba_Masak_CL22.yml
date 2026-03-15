@@ -27,7 +27,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-G-12032026"
+        default: "-NeFaRiaN-3.0-G-16032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -45,6 +45,7 @@ on:
         options:
           - "kernelsu"
           - "kernelsu+susfs"
+          - "sukisu+susfs"
           - "wildksu"
           - "wksu+susfs"
           - "next"
@@ -231,14 +232,6 @@ jobs:
         with:
             swap-size-gb: 24
 
-      - name: "📝 Append custom Makefile line"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
-         echo "Custom Makefile line added successfully"
-         
       - name: "⚙️ Configure Kernel Optimization and TickRate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -558,6 +551,49 @@ jobs:
           EOF
 
           echo "🎉 KernelSU kernel patches fully integrated"
+
+      - name: "🔧 Setup SukiSU-Ultra (Stable)"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu+susfs'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          rm -rf ./KernelSU ./drivers/kernelsu
+          
+          # Install SukiSU-Ultra with SUSFS
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+          
+          # Apply SUSFS patch
+          PATCH_URL="https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest"
+          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
+          
+          if [ -n "$SUSFS_PATCH" ]; then
+            curl -L -o susfs.patch "$SUSFS_PATCH"
+            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
+          fi
+          
+          # Add KSU configs
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KPM=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+          
+          echo "✅ Installed SukiSU-Ultra with SUSFS"
           
       - name: "🔧 Setup Wild KSU"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
@@ -775,6 +811,15 @@ jobs:
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
+
+      - name: "🩹 Apply KPM patch (SukiSU-Ultra only)"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
+        working-directory: ${{ env.WORK_DIR }}/out/dist
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod +x patch
+          ./patch
+          mv oImage Image
   
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
