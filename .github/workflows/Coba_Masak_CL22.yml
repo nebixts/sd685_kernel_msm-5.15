@@ -92,14 +92,6 @@ on:
         required: false
         type: string
         default: "8"
-      LTOOptimizations:
-        description: "Choose LTO"
-        required: true
-        type: choice
-        default: "thin"
-        options:
-          - "thin"
-          - "full"
 
 jobs:
   Build-Kernel:
