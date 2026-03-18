@@ -16,8 +16,13 @@ on:
       kernelBranch:
         description: "Kernel branch"
         required: false
-        type: string
+        type: choice
         default: "google"
+        options:
+          - "google"
+          - "zepharo"
+          - "codelinaro"
+          - "topnotchfreaks"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
@@ -27,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.0-G-16032026"
+        default: "-NeFaRiaN-3.1-G-18032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -56,6 +61,7 @@ on:
         type: choice
         default: "O3"
         options:
+          - "default"
           - "O2"
           - "O3"
           - "Os"
@@ -232,6 +238,15 @@ jobs:
         with:
             swap-size-gb: 24
 
+      - name: "📝 Append custom Makefile line CUSTOM"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
+         echo "Custom Makefile line added successfully"
+
       - name: "⚙️ Configure Kernel Optimization and TickRate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -253,6 +268,9 @@ jobs:
           
           # Apply selected optimization level
           case "${{ github.event.inputs.optimizationLevel }}" in
+            default)
+              # nothing to add here (keep it default)
+              ;;
             O2)
               echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$CONFIG_FILE"
               echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3 is not set" >> "$CONFIG_FILE"
@@ -279,7 +297,7 @@ jobs:
           
           # Apply selected tick rate
           case "${{ github.event.inputs.tickRate }}" in
-          default)
+            default)
               echo Nothing to change. Keep Default.
               ;;
             100)
@@ -883,7 +901,7 @@ jobs:
           if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
             KSU_INFO="_${{ github.event.inputs.ksuVariant }}"
           fi
-          ZIP_NAME="nefarian_cl22b_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          ZIP_NAME="nefarian_cl22_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
