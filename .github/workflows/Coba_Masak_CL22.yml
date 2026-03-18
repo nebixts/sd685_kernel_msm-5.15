@@ -238,8 +238,18 @@ jobs:
         with:
             swap-size-gb: 24
 
-      - name: "📝 Append custom Makefile line CUSTOM"
-        if: github.event.inputs.kernelBranch == 'codelinaro, topnotchfreaks'
+      - name: "📝 Append custom Makefile line CLO"
+        if: github.event.inputs.kernelBranch == 'codelinaro'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
+         echo "Custom Makefile line added successfully"
+
+      - name: "📝 Append custom Makefile line TNF"
+        if: github.event.inputs.kernelBranch == 'topnotchfreaks'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
