@@ -238,6 +238,40 @@ jobs:
         with:
             swap-size-gb: 24
 
+      - name: "😎 Set args for CLO"
+        if: github.event.inputs.kernelBranch == 'codelinaro'
+        id: generate-args
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+            args="-j$(nproc --all)"
+            if [ -n "${{ env.OUT_DIR }}" ]; then
+              mkdir -p $(pwd)/${{ env.OUT_DIR }}
+              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+            fi
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+            args="$args AR=llvm-ar"
+            args="$args CC=clang"
+            echo "args=$args" >> $GITHUB_OUTPUT
+            
+      - name: "😎 Set args for TNF"
+        if: github.event.inputs.kernelBranch == 'topnotchfreaks'
+        id: generate-args
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+            args="-j$(nproc --all)"
+            if [ -n "${{ env.OUT_DIR }}" ]; then
+              mkdir -p $(pwd)/${{ env.OUT_DIR }}
+              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+            fi
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+            args="$args AR=llvm-ar"
+            args="$args CC=clang"
+            echo "args=$args" >> $GITHUB_OUTPUT
+
       - name: "📝 Append custom Makefile line CLO"
         if: github.event.inputs.kernelBranch == 'codelinaro'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -840,6 +874,36 @@ jobs:
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
+
+      - name: "🎶 START Build kernel CLO"
+        if: github.event.inputs.kernelBranch == 'codelinaro'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
+        run: |
+          make ${args} \
+            LLVM=1 \
+            CC=clang \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            -j$(nproc --all)
+
+      - name: "🎶 START Build kernel TNF"
+        if: github.event.inputs.kernelBranch == 'topnotchfreaks'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
+        run: |
+          make ${args} \
+            LLVM=1 \
+            CC=clang \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch (SukiSU-Ultra only)"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu+susfs'
