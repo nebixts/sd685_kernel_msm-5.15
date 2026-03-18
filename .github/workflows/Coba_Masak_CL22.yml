@@ -866,14 +866,14 @@ jobs:
 
           echo "🎉 NEXT with SUSFS Integration complete!"
 
-      - name: "🔨 START Build Kernel"
-        working-directory: ${{ env.WORK_DIR }}
-        run: |
-          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
-           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
-          else
-           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
-          fi
+        #name: "🔨 START Build Kernel"
+        #working-directory: ${{ env.WORK_DIR }}
+        #run: |
+          #if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+           #LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          #else
+           #LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          #fi
 
       - name: "🎶 START Build kernel CLO"
         if: github.event.inputs.kernelBranch == 'codelinaro'
@@ -881,13 +881,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
-           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-          else
-           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-          fi
-          
           make ${args} \
+            LTO=thin \
             LLVM=1 \
             CC=clang \
             AR=llvm-ar \
@@ -902,13 +897,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
-           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-          else
-           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-          fi
-          
           make ${args} \
+            LTO=thin \
             LLVM=1 \
             CC=clang \
             AR=llvm-ar \
