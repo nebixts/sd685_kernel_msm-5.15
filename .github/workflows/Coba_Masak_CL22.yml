@@ -92,6 +92,14 @@ on:
         required: false
         type: string
         default: "8"
+      LTOOptimizations:
+        description: "Choose LTO"
+        required: true
+        type: choice
+        default: "thin"
+        options:
+          - "thin"
+          - "full"
 
 jobs:
   Build-Kernel:
@@ -186,7 +194,7 @@ jobs:
           git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
-      - name: "📥 Initialize Repo ToolChain"
+      - name: "📥 Initialize ToolChain Repo"
         working-directory: ${{ env.WORK_DIR}}
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
@@ -229,60 +237,6 @@ jobs:
         uses: pierotofy/set-swap-space@master
         with:
             swap-size-gb: 24
-
-      - name: "😎 Set args for CLO"
-        if: github.event.inputs.kernelBranch == 'codelinaro'
-        id: generate-args
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-            args="-j$(nproc --all)"
-            if [ -n "${{ env.OUT_DIR }}" ]; then
-              mkdir -p $(pwd)/${{ env.OUT_DIR }}
-              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-            fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
-            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            args="$args AR=llvm-ar"
-            args="$args CC=clang"
-            echo "args=$args" >> $GITHUB_OUTPUT
-            
-      - name: "😎 Set args for TNF"
-        if: github.event.inputs.kernelBranch == 'topnotchfreaks'
-        id: generate-args
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-            args="-j$(nproc --all)"
-            if [ -n "${{ env.OUT_DIR }}" ]; then
-              mkdir -p $(pwd)/${{ env.OUT_DIR }}
-              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-            fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
-            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            args="$args AR=llvm-ar"
-            args="$args CC=clang"
-            echo "args=$args" >> $GITHUB_OUTPUT
-
-      - name: "📝 Append custom Makefile line CLO"
-        if: github.event.inputs.kernelBranch == 'codelinaro'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
-         echo "Custom Makefile line added successfully"
-
-      - name: "📝 Append custom Makefile line TNF"
-        if: github.event.inputs.kernelBranch == 'topnotchfreaks'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
-         echo "Custom Makefile line added successfully"
 
       - name: "⚙️ Configure Kernel Optimization and TickRate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -858,46 +812,14 @@ jobs:
 
           echo "🎉 NEXT with SUSFS Integration complete!"
 
-        #name: "🔨 START Build Kernel"
-        #working-directory: ${{ env.WORK_DIR }}
-        #run: |
-          #if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
-           #LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
-          #else
-           #LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
-          #fi
-
-      - name: "🎶 START Build kernel CLO"
-        if: github.event.inputs.kernelBranch == 'codelinaro'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
+      - name: "🔨 START Build Kernel"
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          make ${args} \
-            LTO=thin \
-            LLVM=1 \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
-            -j$(nproc --all)
-
-      - name: "🎶 START Build kernel TNF"
-        if: github.event.inputs.kernelBranch == 'topnotchfreaks'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
-        run: |
-          make ${args} \
-            LTO=thin \
-            LLVM=1 \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
-            -j$(nproc --all)
+          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          else
+           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          fi
 
       - name: "🩹 Apply KPM patch (SukiSU-Ultra only)"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu+susfs'
