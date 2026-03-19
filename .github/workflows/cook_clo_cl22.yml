@@ -127,7 +127,6 @@ jobs:
       - name: "🧰 Setup Swapfile (optional)"
         run: |
           SWAP_GB="${{ github.event.inputs.swapSizeGB }}"
-          # Normalize empty input to 0
           if [ -z "$SWAP_GB" ]; then
             SWAP_GB=0
           fi
@@ -209,22 +208,6 @@ jobs:
         with:
             swap-size-gb: 24
 
-      - name: "😎 Set args for CLO-TNF"
-        id: generate-args
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-            args="-j$(nproc --all)"
-            if [ -n "${{ env.OUT_DIR }}" ]; then
-              mkdir -p $(pwd)/${{ env.OUT_DIR }}
-              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-            fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
-            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            args="$args AR=llvm-ar"
-            args="$args CC=clang"
-            echo "args=$args" >> $GITHUB_OUTPUT
-            
       - name: "📝 Append custom Makefile line CLO-TNF"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -253,7 +236,6 @@ jobs:
           
           case "${{ github.event.inputs.optimizationLevel }}" in
             default)
-              # nothing to add here (keep it default)
               ;;
             O2)
               echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$CONFIG_FILE"
@@ -424,7 +406,6 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
       - name: "🔧 Setup Wild KSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wksu+susfs'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
@@ -508,6 +489,7 @@ jobs:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
           make ${args} \
+            LTO=thin \
             LLVM=1 \
             CC=clang \
             AR=llvm-ar \
@@ -528,7 +510,7 @@ jobs:
           echo "IMAGE_NAME=Image.$VARIANT_NAME" >> $GITHUB_ENV
 
       - name: 🔍 Check Space (Post-Build)
-        if: always() # Run even if build fails to debug space issues
+        if: always()
         run: |
           echo "Final disk space status:"
           df -h /
