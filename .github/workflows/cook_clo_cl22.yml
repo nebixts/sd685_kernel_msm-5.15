@@ -77,6 +77,14 @@ on:
         required: false
         type: string
         default: "8"
+      LTOOptimizations:
+        description: "Choose LTO"
+        required: true
+        type: choice
+        default: "thin"
+        options:
+          - "thin"
+          - "full"
 
 jobs:
   Build-Kernel:
@@ -483,20 +491,14 @@ jobs:
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
                    
-      - name: "🏃‍♀️‍➡️🚀 START Build kernel CLO"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
+      - name: "🔨 START Build Kernel"
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          make ${args} \
-            LTO=thin \
-            LLVM=1 \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
-            -j$(nproc --all)
+          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          else
+           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          fi
 
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
