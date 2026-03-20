@@ -494,6 +494,7 @@ jobs:
         if: always()
         run: |
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/YASK-NEXT"
+          BANNER_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_msm-5.15/builder/assets/yask.png"
 
           if [[ "${{ job.status }}" == "success" ]]; then
             MESSAGE="✅ *YASK Kernel Released*
@@ -501,17 +502,12 @@ jobs:
           📦 *Build Information:*
           • Kernel: \`Linux 5.15\`
           • Android: \`13-16\`
-          • Base: \`GKI + CLO\`
+          • Base: \`GKI & CLO\`
           • KSU: \`Wild KSU (canary)\`
           • SUSFS: \`Enabled (GKI A13-5.15)\`
           • LTO: \`Full\`
           • Optimization: \`-O2\`
-
-          🧩 *Variants:*
-          • \`Image.gki.ksu\` — GKI + Wild KSU
-          • \`Image.clo.ksu\` — CLO + Wild KSU
-          • \`Image.gki.noksu\` — GKI, no root
-          • \`Image.clo.noksu\` — CLO, no root
+          • BBG: \`Enabled\`
 
           📱 *Supported Devices:*
           • Redmi Note 12 4G/NFC
@@ -521,34 +517,37 @@ jobs:
           🕐 *Build Date:* $(date '+%Y-%m-%d %H:%M:%S UTC')
           📦 *Package:* \`${{ env.ZIP_NAME }}\`
 
-          ⬇️ [Download from GitHub Release]($RELEASE_URL)"
+          ⬇️ [Download Here]($RELEASE_URL)"
 
             curl -s -X POST \
               -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-              -d text="$MESSAGE" \
+              -d photo="${BANNER_URL}" \
+              --data-urlencode "caption=${MESSAGE}" \
               -d parse_mode="Markdown" \
               -d disable_web_page_preview="false" \
-              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto"
 
           else
             FAILURE_MSG="❌ *YASK Kernel Build Failed*
-
+            
           📦 *Build Information:*
           • Kernel: \`Linux 5.15\`
           • Android: \`13-16\`
-          • Base: \`GKI + CLO\`
+          • Base: \`GKI & CLO\`
           • KSU: \`Wild KSU (canary)\`
           • SUSFS: \`Enabled (GKI A13-5.15)\`
           • LTO: \`Full\`
           • Optimization: \`-O2\`
-
+          • BBG: \`Enabled\`
+          
           🕐 *Failed at:* $(date '+%Y-%m-%d %H:%M:%S UTC')
 
           🔍 Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
-
+           
             curl -s -X POST \
               -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-              -d text="$FAILURE_MSG" \
+              -d photo="${BANNER_URL}" \
+              --data-urlencode "caption=${FAILURE_MSG}" \
               -d parse_mode="Markdown" \
-              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto"
           fi
