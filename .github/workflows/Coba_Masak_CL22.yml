@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: choice
-        default: "google"
+        default: "zepharo"
         options:
           - "google"
           - "zepharo"
@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.1-G-18032026"
+        default: "-NeFaRiaN-3.1-Z-21032026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -812,6 +812,15 @@ jobs:
 
           echo "🎉 NEXT with SUSFS Integration complete!"
 
+      - name: "📝 Append custom Makefile line"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
+         echo "Custom Makefile line added successfully"
+    
       - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
