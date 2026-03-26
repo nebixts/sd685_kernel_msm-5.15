@@ -5,6 +5,7 @@
   This program can be distributed under the terms of the GNU GPL.
   See the file COPYING.
 */
+#define dprintk(fmt, ...) pr_debug(fmt, ##__VA_ARGS__)
 
 #include "fuse_i.h"
 
