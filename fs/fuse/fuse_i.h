@@ -36,6 +36,10 @@
 #include <linux/user_namespace.h>
 #include <linux/statfs.h>
 
+#ifndef dprintk
+#define dprintk(fmt, ...) pr_debug("fuse: " fmt, ##__VA_90_args__)
+#endif
+
 #define FUSE_SUPER_MAGIC 0x65735546
 
 /** Default max number of pages that can be used in a single read request */
