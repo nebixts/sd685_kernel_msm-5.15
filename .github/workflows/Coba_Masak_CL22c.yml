@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.2-Z-26032026"
+        default: "-NeFaRiaN-3.2-Z-03042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -147,24 +147,20 @@ jobs:
           df -h /
 
       - name: "🧰 Setup Swapfile (optional)"
-        # swap creation happens early so build processes can use it
         run: |
           SWAP_GB="${{ github.event.inputs.swapSizeGB }}"
-          # Normalize empty input to 0
           if [ -z "$SWAP_GB" ]; then
             SWAP_GB=0
           fi
 
           if [ "$SWAP_GB" != "0" ]; then
             echo "Requested swap: ${SWAP_GB}G"
-            # If /swapfile exists, try to remove it first to avoid conflicts
             if [ -f /swapfile ]; then
               echo "Existing /swapfile found, disabling and removing..."
               sudo swapoff /swapfile || true
               sudo rm -f /swapfile
             fi
 
-            # Try to create swap with fallocate for speed; fallback to dd
             if command -v fallocate >/dev/null 2>&1; then
               echo "Creating swapfile with fallocate..."
               sudo fallocate -l ${SWAP_GB}G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_GB * 1024))
@@ -176,7 +172,6 @@ jobs:
             sudo chmod 600 /swapfile
             sudo mkswap /swapfile
             sudo swapon /swapfile
-            # Reduce swappiness so system prefers RAM but can use swap when needed
             sudo sysctl -w vm.swappiness=10 || true
 
             echo "SWAP_CREATED=true" >> $GITHUB_ENV
@@ -579,7 +574,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Installing WildKSU
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s dev
       
           echo "✔ Wild KSU installed successfully"
           
