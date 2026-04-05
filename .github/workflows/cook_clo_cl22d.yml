@@ -251,6 +251,10 @@ jobs:
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
+            args="$args NM=llvm-nm"
+            args="$args OBJCOPY=llvm-objcopy"
+            args="$args STRIP=llvm-strip"
+            args="$args DEPMOD=depmod"
             args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
             
