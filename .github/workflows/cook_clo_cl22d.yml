@@ -217,14 +217,11 @@ jobs:
            -e '$a\KMI_ENFORCED=0' \
            -e '/^MODULES_ORDER=/d' \
            -e '/^MODULES_LIST=/d' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-         
           CLANG_BIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2/bin"
           echo "$CLANG_BIN_PATH" >> $GITHUB_PATH                    
-          sed -i "s|^CLANG_PREBUILT_BIN=.*|CLANG_PREBUILT_BIN=$CLANG_BIN_PATH|" \
-          export CC=clang
-          export CLANG_TRIPLE=aarch64-linux-gnu-
-          
+          sed -i "s|^CLANG_PREBUILT_BIN=.*|CLANG_PREBUILT_BIN=$CLANG_BIN_PATH|" \         
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
+                   
       - name: "🔍 Verify ToolChain Version"
         run: |
           echo "Checking system PATH for clang..."
