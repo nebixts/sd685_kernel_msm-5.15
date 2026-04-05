@@ -562,7 +562,7 @@ jobs:
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
           
       - name: "👍 Make defconfig"
-         run: |
+        run: |
           # Define the absolute path to your XClang
           TC_DIR="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
           
