@@ -103,8 +103,7 @@ jobs:
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
-          sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
-
+          sudo apt-get install -y repo rsync aria2 build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev libxml2 libxml2-dev libtinfo5
       - name: 🔍 Check Space (Before CleanUp)
         run: |
           echo "Disk space before cleanup:"
@@ -546,6 +545,13 @@ jobs:
          echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
          echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
          echo "Custom Makefile line added successfully"
+
+      - name: "👍 Make defconfig"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
+        run: |
+          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
     
          # sed -i 's/^LTO=.*/LTO=thin/' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
          # sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
