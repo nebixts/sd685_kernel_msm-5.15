@@ -178,18 +178,21 @@ jobs:
 
       - name: "📥 Initialize ToolChain Repo"
         working-directory: ${{ env.WORK_DIR}}
-        run: |
+        run: |          
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync --optimized-fetch --prune --no-clone-bundle --no-tags -j$(nproc --all)
           
           rm -rf .repo
           rm -rf common
                                                                                     
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r596125x.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.5.8/clang-r596125x.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r596125x
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r596125x.tar.gz -C prebuilts/clang/host/linux-x86/clang-r596125x
-          rm -rf prebuilts/clang/host/linux-x86/clang-r596125x.tar.gz
+          aria2c -x 16 -s 16 -o xclang.tar.gz "https://github.com/Xtra-Manager-Software/XClang-Binaries/releases/download/xclangpolly-thinlto-22.1.2/XClang-22.1.2-Polly.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/xclang
+          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang
+          rm -rf xclang.tar.gz
 
+          echo "$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang/bin" >> $GITHUB_PATH
+
+          rm -rf prebuilts/clang/host/linux-x86/clang-r596125
           rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
@@ -197,7 +200,7 @@ jobs:
          
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r596125x/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=xclang/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
           sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -512,6 +515,9 @@ jobs:
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
+          sed -i 's/^LTO=.*/LTO=thin/' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
+          sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
           
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
