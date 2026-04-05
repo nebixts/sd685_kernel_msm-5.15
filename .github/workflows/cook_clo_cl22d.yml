@@ -511,7 +511,7 @@ jobs:
          # sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
           # ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
 
-      - name: "🚀 Build Kernel"
+      - name: "🚀 Setup ToolChain for Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
           # Define the toolchain path
@@ -523,14 +523,22 @@ jobs:
           # Run the build with explicit compiler paths
           cd common_gki/common
           make LLVM=1 \
-               LTO=thin \
                CC=clang \
                CLANG_TRIPLE=aarch64-linux-gnu- \
                DEPMOD=depmod \
                DTC=${{ env.WORK_DIR }}/build/kernel/build-tools/path/linux-x86/dtc \
                O=${{ env.WORK_DIR }}/out/common_gki/common \
                -j$(nproc --all) gki_defconfig
-               
+
+      - name: "🔨 START Build Kernel"
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          else
+           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          fi
+          
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
