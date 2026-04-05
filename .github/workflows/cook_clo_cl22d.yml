@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: choice
-        default: "zepharo"
+        default: "codelinaro"
         options:
           - "google"
           - "zepharo"
@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.3-Z-05042026"
+        default: "-NeFaRiaN-3.3-C-05042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -187,8 +187,8 @@ jobs:
                                                                                     
           # Download and Extract XClang
           aria2c -x 16 -s 16 -o xclang.tar.gz "https://github.com/Xtra-Manager-Software/XClang-Binaries/releases/download/xclangpolly-thinlto-22.1.2/XClang-22.1.2-Polly.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/xclang-22.1.2
-          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang-22.1.2
+          mkdir -p prebuilts/clang/host/linux-x86/xclang
+          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang
           rm -rf xclang.tar.gz
 
           # Cleanup old versions
@@ -220,7 +220,7 @@ jobs:
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
 
           # Define the absolute path to your new Clang binaries
-          CLANG_BIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2/bin"
+          CLANG_BIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang/bin"
           
           # Add to GitHub Actions PATH (for subsequent steps)
           echo "$CLANG_BIN_PATH" >> $GITHUB_PATH
@@ -228,7 +228,7 @@ jobs:
           # Update the build config to ensure the build script knows where to look
           # Note: CLANG_PREBUILT_BIN is a common variable used in Android build.sh scripts
           sed -i "s|^CLANG_PREBUILT_BIN=.*|CLANG_PREBUILT_BIN=$CLANG_BIN_PATH|" \
-          ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki || true
+          ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 || true
           
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
@@ -527,7 +527,7 @@ jobs:
           # -O3: Required for Polly to function effectively
           # -mllvm -polly-vectorizer=stripmine: Optional extra vectorization
           sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
 
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
            LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
