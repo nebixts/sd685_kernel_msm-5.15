@@ -238,26 +238,6 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"
 
-      - name: "😎 Set args for GKI kernels"
-        id: generate-args
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-            args="-j$(nproc --all)"
-            if [ -n "${{ env.OUT_DIR }}" ]; then
-              mkdir -p $(pwd)/${{ env.OUT_DIR }}
-              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-            fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
-            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            args="$args AR=llvm-ar"
-            args="$args NM=llvm-nm"
-            args="$args OBJCOPY=llvm-objcopy"
-            args="$args STRIP=llvm-strip"
-            args="$args DEPMOD=depmod"
-            args="$args CC=clang"
-            echo "args=$args" >> $GITHUB_OUTPUT
-            
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
         with:
@@ -547,34 +527,38 @@ jobs:
          echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
          echo "Custom Makefile line added successfully"
 
-      - name: "👍 Make defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
+      - name: "🚀 Build Kernel"
         run: |
-          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
-    
-         # sed -i 's/^LTO=.*/LTO=thin/' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
-         # sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
-          # ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
+          # 1. Define Paths
+          export TOOLCHAIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
+          export PATH="$TOOLCHAIN_PATH/bin:$PATH"
+          export LD_LIBRARY_PATH="$TOOLCHAIN_PATH/lib:$LD_LIBRARY_PATH"
 
-      - name: "🎶 Build kernel"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
-        run: |
-          make ${args} \
-            LLVM=1 \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
-            DEPMOD=depmod \
-            DTC=${{ env.WORK_DIR }}/build/kernel/build-tools/path/linux-x86/dtc \
-            O=${{ env.WORK_DIR }}/out/common_gki/common \
-            -j$(nproc --all)
-            
+          # 2. Kernel Build Command
+          # Using LLVM=1 handles CC, LD, AR, etc. automatically
+          cd common_gki/common
+          make -j$(nproc --all) \
+               O=out \
+               ARCH=arm64 \
+               LLVM=1 \
+               LLVM_IAS=1 \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+               KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine" \
+               gki_defconfig
+
+          # 3. Start Compilation
+          make -j$(nproc --all) \
+               O=out \
+               ARCH=arm64 \
+               LLVM=1 \
+               LLVM_IAS=1 \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+               KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"
+
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
