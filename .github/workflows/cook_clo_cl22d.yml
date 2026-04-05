@@ -551,13 +551,6 @@ jobs:
          # sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
           # ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
 
-      - name: "👍 Make defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
-        run: |
-          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
-
       - name: "🎶 Build kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
