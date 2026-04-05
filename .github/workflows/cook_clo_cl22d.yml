@@ -79,15 +79,7 @@ on:
         required: false
         type: string
         default: "8"
-      LTOOptimizations:
-        description: "Choose LTO"
-        required: true
-        type: choice
-        default: "thin"
-        options:
-          - "thin"
-          - "full"
-
+      
 jobs:
   Build-Kernel:
     name: "🚀 Build Kernel"
@@ -176,48 +168,92 @@ jobs:
           git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
-      - name: "📥 Initialize ToolChain Repo"
-        working-directory: ${{ env.WORK_DIR}}
-        run: |          
-          repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
-          repo sync --optimized-fetch --prune --no-clone-bundle --no-tags -j$(nproc --all)
+      - name: "💫 Get Toolchains Repo"
+        run: |
+          set -e  # Exit on errors
+      
+          # Function to fetch latest release tar.gz URL from GitHub
+          get_latest_github_release() {
+            local repo_url="$1"
+            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
+            
+            if [[ -z "$latest_url" ]]; then
+              echo "❌ Failed to fetch latest release from $repo_url!"
+              exit 1
+            fi
+      
+            printf "%s" "$latest_url"  # Use printf to output only the URL
+          }
+      
+          clang_url=$(get_latest_github_release "Xtra-Manager-Software/XClang-Binaries")
+      
+          echo "✅ Clang URL: $clang_url"
+      
+          # Create clang directory
+          mkdir -p clang
+      
+          # Check if it's an archive or a Git repo
+          if [[ "$clang_url" == *.tar.gz ]]; then
+            echo "🚀 Downloading latest Clang from: $clang_url..."
+            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
+      
+            # Extract Clang
+            echo "📦 Extracting Clang..."
+            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
+            rm -f clang/clang.tar.gz
+          else
+            echo "🚀 Cloning Clang from $clang_url..."
+            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
+          fi
+      
+          # Find Clang's bin directory
+          if [ -d "clang/bin" ]; then
+            CLANG_PATH="${{ github.workspace }}/clang/bin"
+          else
+            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
+            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
+          fi
+      
+          # Ensure Clang binary exists
+          if [ ! -f "$CLANG_PATH/clang" ]; then
+            echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
+            ls -R clang  # Debugging: Show extracted files
+            exit 1
+          fi
+      
+          echo "✅ Using Clang from $CLANG_PATH"
+          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
+          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
+      
+          export PATH="$CLANG_PATH:$PATH"
+          export CLANG_TRIPLE="aarch64-linux-gnu-"
+          export CC=clang
+          export AR="llvm-ar"
+          export AS="llvm-as"
+          export NM="llvm-nm"
+          export OBJCOPY="llvm-objcopy"
+          export OBJDUMP="llvm-objdump"
+          export STRIP="llvm-strip"
           
-          rm -rf .repo
-          rm -rf common
-                                                                                    
-          aria2c -x 16 -s 16 -o xclang.tar.gz "https://github.com/Xtra-Manager-Software/XClang-Binaries/releases/download/xclangpolly-thinlto-22.1.2/XClang-22.1.2-Polly.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/xclang-22.1.2
-          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang-22.1.2
-          rm -rf xclang.tar.gz
+          echo "⚙️ Using Clang version:"
+          clang --version || echo "❌ Clang not found in PATH!"
 
-          echo "$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2/bin" >> $GITHUB_PATH
-
-          rm -rf prebuilts/clang/host/linux-x86/clang-r596125
-          rm -rf prebuilts/clang/host/linux-x86/clang-r547379
-          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
-          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
-          rm -rf prebuilts/clang/host/linux-x86/clang-stable
-         
-          sed -i \
-           -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=xclang-22.1.2/' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
-          
-          sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
-          sed -i '$a\DEFCONFIG=${{ env.DEFCONFIG_NAME }}' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
-          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
-
-          sed -i \
-           -e '/^KMI_SYMBOL_LIST_STRICT_MODE=/d' \
-           -e '/^TRIM_NONLISTED_KMI=/d' \
-           -e '/^KMI_ENFORCED=/d' \
-           -e '$a\KMI_SYMBOL_LIST_STRICT_MODE=0' \
-           -e '$a\TRIM_NONLISTED_KMI=0' \
-           -e '$a\KMI_ENFORCED=0' \
-           -e '/^MODULES_ORDER=/d' \
-           -e '/^MODULES_LIST=/d' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-   
+      - name: "😎 Set args for GKI kernels"
+        id: generate-args
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+            args="-j$(nproc --all)"
+            if [ -n "${{ env.OUT_DIR }}" ]; then
+              mkdir -p $(pwd)/${{ env.OUT_DIR }}
+              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+            fi
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+            args="$args AR=llvm-ar"
+            args="$args CC=clang"
+            echo "args=$args" >> $GITHUB_OUTPUT
+            
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
         with:
@@ -511,27 +547,30 @@ jobs:
          # sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
           # ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
 
-      - name: "🚀 Setup ToolChain & Build Kernel"
-        working-directory: ${{ env.WORK_DIR }}
+      - name: "👍 Make defconfig"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
         run: |
-          # Define the toolchain path
-          TOOLCHAIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2/bin"
-          
-          # Add toolchain to PATH for this specific run block
-          export PATH="$TOOLCHAIN_PATH:$PATH"
-          
-          # Run the build with explicit compiler paths
-          cd common_gki/common
-          make LLVM=1 \
-               LTO=thin \
-               CC=clang \
-               CLANG_TRIPLE=aarch64-linux-gnu- \
-               DEPMOD=depmod \
-               DTC=${{ env.WORK_DIR }}/build/kernel/build-tools/path/linux-x86/dtc \
-               O=${{ env.WORK_DIR }}/out/common_gki/common \
-               
-          LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
 
+      - name: "🎶 Build kernel"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
+        run: |
+          make ${args} \
+            LLVM=1 \
+            CC=clang \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            DEPMOD=depmod \
+            DTC=${{ env.WORK_DIR }}/build/kernel/build-tools/path/linux-x86/dtc \
+            O=${{ env.WORK_DIR }}/out/common_gki/common \
+            -j$(nproc --all)
+            
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
