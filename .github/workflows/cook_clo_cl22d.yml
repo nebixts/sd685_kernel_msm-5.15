@@ -249,14 +249,21 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"
 
-          # Go to the XClang library folder
-          cd prebuilts/clang/host/linux-x86/xclang-22.1.2/lib     
-          # Create the missing link right inside the toolchain
-          # This points the 'missing' .16 version to the system's .2 version
-          ln -sf /usr/lib/x86_64-linux-gnu/libxml2.so.2 ./libxml2.so.16
+          # --- DYNAMIC LIBXML2 FIX ---
+          # We use ${CLANG_PATH%/bin} to get the parent folder of 'bin'
+          TC_ROOT="${CLANG_PATH%/bin}"
+          TC_LIB_DIR="$TC_ROOT/lib"
           
-          # Go back to work dir
-          cd -
+          echo "🔧 Fixing libxml2 in $TC_LIB_DIR..."
+          mkdir -p "$TC_LIB_DIR"
+          
+          # Create the symlink inside the detected toolchain folder
+          ln -sf /usr/lib/x86_64-linux-gnu/libxml2.so.2 "$TC_LIB_DIR/libxml2.so.16"
+          
+          # Also export LD_LIBRARY_PATH for the current and future steps
+          echo "LD_LIBRARY_PATH=$TC_LIB_DIR:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          
+          echo "✅ Toolchain setup complete."
           
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
