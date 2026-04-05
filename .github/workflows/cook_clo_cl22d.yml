@@ -187,8 +187,8 @@ jobs:
                                                                                     
           # Download and Extract XClang
           aria2c -x 16 -s 16 -o xclang.tar.gz "https://github.com/Xtra-Manager-Software/XClang-Binaries/releases/download/xclangpolly-thinlto-22.1.2/XClang-22.1.2-Polly.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/xclang-22.1.2/bin
-          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang-22.1.2/bin
+          mkdir -p prebuilts/clang/host/linux-x86/xclang-22.1.2
+          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang-22.1.2
           rm -rf xclang.tar.gz
 
           # Cleanup old versions
@@ -219,6 +219,17 @@ jobs:
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
 
+          # Define the absolute path to your new Clang binaries
+          CLANG_BIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2/bin"
+          
+          # Add to GitHub Actions PATH (for subsequent steps)
+          echo "$CLANG_BIN_PATH" >> $GITHUB_PATH
+          
+          # Update the build config to ensure the build script knows where to look
+          # Note: CLANG_PREBUILT_BIN is a common variable used in Android build.sh scripts
+          sed -i "s|^CLANG_PREBUILT_BIN=.*|CLANG_PREBUILT_BIN=$CLANG_BIN_PATH|" \
+          ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki || true
+          
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
         with:
@@ -510,23 +521,13 @@ jobs:
     
       - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
-        run: |
-          # Set the path to your new XClang installation
-          export CLANG_PATH=$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2
-
-          # Add the clang binaries to the system PATH
-          export PATH=$CLANG_PATH/bin:$PATH
-
-          # Optional: specifically tell the build system where LLVM tools are
-          export LLVM=1
-          export LLVM_IAS=1
-
+        run: |         
           # Inject Polly & Optimization Flags into KCFLAGS
           # -mllvm -polly: Enables the polyhedral optimizer
           # -O3: Required for Polly to function effectively
           # -mllvm -polly-vectorizer=stripmine: Optional extra vectorization
-          sed -i '$a\KCFLAGS="-mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
+          sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
 
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
            LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
