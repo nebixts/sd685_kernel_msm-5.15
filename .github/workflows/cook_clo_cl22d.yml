@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.3-C-05042026"
+        default: "-NeFaRiaN-3.3-C-06042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -243,6 +243,35 @@ jobs:
         with:
             swap-size-gb: 24
 
+      - name: "😎 Set args for GKI kernels"
+        id: generate-args
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+            args="-j$(nproc --all)"
+            if [ -n "${{ env.OUT_DIR }}" ]; then
+              mkdir -p $(pwd)/${{ env.OUT_DIR }}
+              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+            fi
+            
+            # Standard GKI flags
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+            
+            # XClang Specific Optimizations
+            args="$args KCFLAGS='-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine'"
+            
+            echo "args=$args" >> $GITHUB_OUTPUT
+
+      - name: "📝 Append custom Makefile line"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
+         echo "Custom Makefile line added successfully"
+            
       - name: "⚙️ Configure Kernel Optimization and TickRate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -518,14 +547,14 @@ jobs:
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
           
-      - name: "📝 Append custom Makefile line"
+      - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
-         echo "Custom Makefile line added successfully"
+          # Ensure Clang is visible to this specific 'make' run
+          export PATH="$CLANG_PATH:$PATH"
+          export LD_LIBRARY_PATH="${CLANG_PATH%/bin}/lib:$LD_LIBRARY_PATH"
+          
+          make ${{ steps.generate-args.outputs.args }} ${{ env.DEFCONFIG_NAME }}
 
       - name: "🚀 Build Kernel"
         run: |
