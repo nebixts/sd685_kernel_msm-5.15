@@ -193,19 +193,23 @@ jobs:
           rm -rf .repo
           rm -rf common
                                                                                     
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r596125.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.5.7/clang-r596125.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r596125
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r596125.tar.gz -C prebuilts/clang/host/linux-x86/clang-r596125
-          rm -rf prebuilts/clang/host/linux-x86/clang-r596125.tar.gz
+          # Download and Extract XClang
+          aria2c -x 16 -s 16 -o xclang.tar.gz "https://github.com/Xtra-Manager-Software/XClang-Binaries/releases/download/xclangpolly-thinlto-22.1.2/XClang-22.1.2-Polly.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/xclang-22.1.2
+          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang-22.1.2
+          rm -rf xclang.tar.gz
 
+          # Cleanup old versions
+          rm -rf prebuilts/clang/host/linux-x86/clang-r596125
           rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
          
+          # Update build config to point to the new directory
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r596125/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=xclang-22.1.2/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
           sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -222,7 +226,7 @@ jobs:
            -e '/^MODULES_ORDER=/d' \
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-   
+
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
         with:
@@ -617,7 +621,18 @@ jobs:
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
+          
+          # 1. Enable ThinLTO in the build config
+          # This is the standard Android/GKI way to toggle LTO modes
+          sed -i 's/^LTO=.*/LTO=thin/' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
 
+          # 2. Inject Polly & Optimization Flags into KCFLAGS
+          # -mllvm -polly: Enables the polyhedral optimizer
+          # -O3: Required for Polly to function effectively
+          # -mllvm -polly-vectorizer=stripmine: Optional extra vectorization
+          sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
+           
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
