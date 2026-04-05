@@ -1,4 +1,4 @@
-name: "cook_clo_cl22"
+name: "Coba_Masak_CL22c"
 
 env:
   OUT_DIR: "out"
@@ -12,13 +12,15 @@ on:
         description: "Kernel source URL"
         required: true
         type: string
-        default: "https://github.com/topnotchfreaks/kernel_msm-5.15"
+        default: "https://github.com/nebixts/sd685_kernel_msm-5.15"
       kernelBranch:
         description: "Kernel branch"
         required: false
         type: choice
-        default: "codelinaro"
+        default: "zepharo"
         options:
+          - "google"
+          - "zepharo"
           - "codelinaro"
           - "topnotchfreaks"
       kernelDevice:
@@ -30,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.1-C-19032026"
+        default: "-NeFaRiaN-3.3-Z-05042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -40,6 +42,14 @@ on:
           - "noksu"
           - "ksu"
           - "both"
+      ksuVariant:
+        description: "KSU implementation (if KSU enabled)"
+        required: true
+        type: choice
+        default: "wksu+susfs"
+        options:
+          - "kernelsu+susfs"
+          - "wksu+susfs"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -118,12 +128,14 @@ jobs:
 
       - name: 🧹 Aggressive CleanUp
         run: |
+          # Remove heavy pre-installed tools
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-         
+          
+          # Prune Docker to remove hidden images and build cache
           sudo docker image prune --all --force
           sudo docker builder prune -a -f
 
@@ -172,7 +184,7 @@ jobs:
           git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
-      - name: "📥 Initialize Repo ToolChain"
+      - name: "📥 Initialize ToolChain Repo"
         working-directory: ${{ env.WORK_DIR}}
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
@@ -181,10 +193,10 @@ jobs:
           rm -rf .repo
           rm -rf common
                                                                                     
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.5.3/clang-r584948b.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r584948b
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz -C prebuilts/clang/host/linux-x86/clang-r584948b
-          rm -rf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r596125.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.5.7/clang-r596125.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-r596125
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r596125.tar.gz -C prebuilts/clang/host/linux-x86/clang-r596125
+          rm -rf prebuilts/clang/host/linux-x86/clang-r596125.tar.gz
 
           rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
@@ -193,7 +205,7 @@ jobs:
          
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r584948b/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r596125/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
           sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -216,20 +228,12 @@ jobs:
         with:
             swap-size-gb: 24
 
-      - name: "📝 Append custom Makefile line CLO-TNF"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
-         echo "Custom Makefile line added successfully"
-
       - name: "⚙️ Configure Kernel Optimization and TickRate"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
           
+          # Helper
           apply_patch() {
             local url="$1";
             local file=$(basename "$url")
@@ -238,12 +242,15 @@ jobs:
             rm -f "$file"
           }
           
+          # Remove existing optimization configs
           sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE/d' "$CONFIG_FILE"
           sed -i '/CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3/d' "$CONFIG_FILE"
           sed -i '/CONFIG_CC_OPTIMIZE_FOR_SIZE/d' "$CONFIG_FILE"
           
+          # Apply selected optimization level
           case "${{ github.event.inputs.optimizationLevel }}" in
             default)
+              # nothing to add here (keep it default)
               ;;
             O2)
               echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$CONFIG_FILE"
@@ -412,14 +419,116 @@ jobs:
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
+    
+      - name: "🔧 Setup KernelSU with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu+susfs'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          rm -rf ./KernelSU ./drivers/kernelsu
+
+          echo "📦 Installing KernelSU..."
+          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
+
+          echo "✔ KernelSU installed successfully"
+          
+          echo "📦 Cloning SUSFS4KSU..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+
+          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+
+          echo "🔧 Applying SUSFS kernel patch if possible...";
+          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+            echo "✅ SUSFS patch successfully applied"
+          else
+            echo "⚠️ SUSFS patch failed — copying files manually"
+          fi
+
+          echo "📄 Forcing SUSFS source injection..."
+
+          # Always replace fs/susfs.c
+          mkdir -p fs
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+          echo "✔ Copied fs/susfs.c"
+
+          # Always replace include/linux/susfs.h
+          mkdir -p include/linux
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          echo "✔ Copied include/linux/susfs.h"
+
+          # NEW: Also install missing susfs_def.h
+          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
+            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+            echo "✔ Copied include/linux/susfs_def.h"
+          else
+            echo "⚠️ susfs_def.h not found in repo"
+          fi
+
+          echo "📦 Injecting SUSFS -> KernelSU integration files"
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
+          fi
+
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+
+          if [ -f "$KSU_PATCH" ]; then
+            cd KernelSU
+            if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
+              patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
+              cd ..
+            else
+              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
+              cd ..
+              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+            fi
+          else
+            echo "⚠️ KSU patch missing — manually injecting changes"
+            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+          fi
+
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
+
+          rm -rf susfs4ksu
+
+          # Add KSU/KSUN/WKSU configs with SUSFS
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+
+          echo "🎉 KernelSU kernel patches fully integrated"
 
       - name: "🔧 Setup Wild KSU with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wksu+susfs'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
           
           echo "📦 Installing Wild KSU..."
 
+          # Installing WildKSU
           curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
       
           echo "✔ Wild KSU installed successfully"
@@ -490,7 +599,16 @@ jobs:
           EOF
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
-                   
+          
+      - name: "📝 Append custom Makefile line"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+         echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-uninitialized-const-pointer' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
+         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
+         echo "Custom Makefile line added successfully"
+    
       - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
@@ -520,10 +638,12 @@ jobs:
       - name: "♻️ Remove swapfile (cleanup)"
         if: always()
         run: |
+ 
           if [ -f /swapfile ]; then
             echo "Disabling and removing /swapfile..."
             sudo swapoff /swapfile || true
             sudo rm -f /swapfile || true
+   
             sudo sysctl -w vm.swappiness=60 || true
             echo "Swapfile removed."
           else
@@ -551,14 +671,14 @@ jobs:
         run: |
           BUILD_TIME=$(date +'%d-%m-%Y')
           git clone --depth=1 https://github.com/nebixts/AnyKernel3 -b master AnyKernel3
-          
+
           find kernels -name "Image.*" -exec cp {} AnyKernel3/ \;
           
           KSU_INFO=""
           if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
             KSU_INFO="_${{ github.event.inputs.ksuVariant }}"
           fi
-          ZIP_NAME="nefarian_cl22_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          ZIP_NAME="nefarian_cl22d_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
