@@ -1,4 +1,4 @@
-name: "Coba_Masak_CL22c"
+name: "Cook_CLO_CL22d"
 
 env:
   OUT_DIR: "out"
@@ -476,6 +476,9 @@ jobs:
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -508,23 +511,29 @@ jobs:
       - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
+          # Set the path to your new XClang installation
+          export CLANG_PATH=$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2
+
+          # Add the clang binaries to the system PATH
+          export PATH=$CLANG_PATH/bin:$PATH
+
+          # Optional: specifically tell the build system where LLVM tools are
+          export LLVM=1
+          export LLVM_IAS=1
+
+          # Inject Polly & Optimization Flags into KCFLAGS
+          # -mllvm -polly: Enables the polyhedral optimizer
+          # -O3: Required for Polly to function effectively
+          # -mllvm -polly-vectorizer=stripmine: Optional extra vectorization
+          sed -i '$a\KCFLAGS="-mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
+
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
            LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           fi
           
-          # 1. Enable ThinLTO in the build config
-          # This is the standard Android/GKI way to toggle LTO modes
-          sed -i 's/^LTO=.*/LTO=thin/' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
-
-          # 2. Inject Polly & Optimization Flags into KCFLAGS
-          # -mllvm -polly: Enables the polyhedral optimizer
-          # -O3: Required for Polly to function effectively
-          # -mllvm -polly-vectorizer=stripmine: Optional extra vectorization
-          sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.common
-           
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
