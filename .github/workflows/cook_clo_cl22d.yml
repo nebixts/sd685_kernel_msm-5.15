@@ -625,10 +625,10 @@ jobs:
           if [ "${{ matrix.variant }}" == "ksu" ]; then
             VARIANT_NAME="${{ matrix.variant }}";
           fi
-          cp out/dist/Image Image.$VARIANT_NAME
+          cp out/arch/arm64/boot/Image Image.$VARIANT_NAME
           echo "ARTIFACT_NAME=kernel-${VARIANT_NAME}-${{ github.event.inputs.optimizationLevel }}-${{ github.event.inputs.tickRate }}hz" >> $GITHUB_ENV
           echo "IMAGE_NAME=Image.$VARIANT_NAME" >> $GITHUB_ENV
-
+         
       - name: 🔍 Check Space (Post-Build)
         if: always()
         run: |
