@@ -185,23 +185,19 @@ jobs:
           rm -rf .repo
           rm -rf common
                                                                                     
-          # Download and Extract XClang
-          aria2c -x 16 -s 16 -o xclang.tar.gz "https://github.com/Xtra-Manager-Software/XClang-Binaries/releases/download/xclangpolly-thinlto-22.1.2/XClang-22.1.2-Polly.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/xclang-22.1.2
-          tar -xzf xclang.tar.gz -C prebuilts/clang/host/linux-x86/xclang-22.1.2
-          rm -rf xclang.tar.gz
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r596125x.tar.gz "https://github.com/nebixts/clang_L/releases/download/v1.5.8/clang-r596125x.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-r596125x
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r596125x.tar.gz -C prebuilts/clang/host/linux-x86/clang-r596125x
+          rm -rf prebuilts/clang/host/linux-x86/clang-r596125x.tar.gz
 
-          # Cleanup old versions
-          rm -rf prebuilts/clang/host/linux-x86/clang-r596125
           rm -rf prebuilts/clang/host/linux-x86/clang-r547379
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
          
-          # Update build config to point to the new directory
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=xclang-22.1.2/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r596125x/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
           sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -217,22 +213,8 @@ jobs:
            -e '$a\KMI_ENFORCED=0' \
            -e '/^MODULES_ORDER=/d' \
            -e '/^MODULES_LIST=/d' \
-          CLANG_BIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2/bin"
-          echo "$CLANG_BIN_PATH" >> $GITHUB_PATH                    
-          sed -i "s|^CLANG_PREBUILT_BIN=.*|CLANG_PREBUILT_BIN=$CLANG_BIN_PATH|" \         
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-                   
-      - name: "🔍 Verify ToolChain Version"
-        run: |
-          echo "Checking system PATH for clang..."
-          which clang
-          
-          echo "Displaying Clang version information:"
-          clang --version
-          
-          echo "Verifying Polly support:"
-          clang --help | grep -i "polly" || echo "Polly flag not found in help (Check XClang build)"
-          
+   
       - name: "📐 Setup SWAP 24GB"
         uses: pierotofy/set-swap-space@master
         with:
@@ -524,14 +506,7 @@ jobs:
     
       - name: "🔨 START Build Kernel"
         working-directory: ${{ env.WORK_DIR }}
-        run: |         
-          # Inject Polly & Optimization Flags into KCFLAGS
-          # -mllvm -polly: Enables the polyhedral optimizer
-          # -O3: Required for Polly to function effectively
-          # -mllvm -polly-vectorizer=stripmine: Optional extra vectorization
-          sed -i '$a\KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"' \
-           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
-
+        run: |                 
           if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
            LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           else
