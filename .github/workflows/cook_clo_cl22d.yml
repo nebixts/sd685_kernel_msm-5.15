@@ -662,29 +662,44 @@ jobs:
       - name: "📥 Download artifacts"
         uses: actions/download-artifact@v4
         with:
+          # Use the name you defined in the Build-Kernel job
+          # If you used a dynamic name, you might need to use a pattern or fixed name
+          merge-multiple: true 
           path: ./kernels/
 
       - name: "📦 Create flashable ZIP"
         run: |
           BUILD_TIME=$(date +'%d-%m-%Y')
+          # 1. Setup AnyKernel3
           git clone --depth=1 https://github.com/nebixts/AnyKernel3 -b master AnyKernel3
+          rm -rf AnyKernel3/.git
 
-          find kernels -name "Image.*" -exec cp {} AnyKernel3/ \;
+          # 2. Find and Rename the Image (AnyKernel3 looks for 'Image' specifically)
+          # This finds your Image.ksu or Image.normal and moves it to AnyKernel3/Image
+          find kernels/ -name "Image.*" -type f -exec cp {} AnyKernel3/Image \;
           
+          # 3. Construct ZIP Name
           KSU_INFO=""
           if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
             KSU_INFO="_${{ github.event.inputs.ksuVariant }}"
           fi
-          ZIP_NAME="nefarian_cl22d_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          
+          ZIP_NAME="nefarian_xcl22_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          
+          # 4. Create ZIP
           cd AnyKernel3
-          zip -r9 "../$ZIP_NAME" * -x .git/*
+          zip -r9 "../$ZIP_NAME" ./*
           cd ..
-          echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
+
+          # 5. Export for next step
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
 
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
+          # Use a simpler name for the Artifact entry to avoid 'empty/invalid name' errors
           name: ${{ env.ZIP_NAME }}
           path: ${{ env.ZIP_PATH }}
           retention-days: 7
+
