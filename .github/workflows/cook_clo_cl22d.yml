@@ -37,7 +37,7 @@ on:
         description: "Build KSU variant?"
         required: true
         type: choice
-        default: "both"
+        default: "ksu"
         options:
           - "noksu"
           - "ksu"
@@ -618,17 +618,14 @@ jobs:
                CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
                KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"
 
-      - name: "📦 Prepare artifact"
+      - name: 📦 Prepare artifact
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          VARIANT_NAME="${{ matrix.variant }}";
-          if [ "${{ matrix.variant }}" == "ksu" ]; then
-            VARIANT_NAME="${{ matrix.variant }}";
-          fi
-          cp out/arch/arm64/boot/Image Image.$VARIANT_NAME
-          echo "ARTIFACT_NAME=kernel-${VARIANT_NAME}-${{ github.event.inputs.optimizationLevel }}-${{ github.event.inputs.tickRate }}hz" >> $GITHUB_ENV
-          echo "IMAGE_NAME=Image.$VARIANT_NAME" >> $GITHUB_ENV
-         
+         mkdir -p out/dist
+        
+         src="${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/Image"
+         cp "${src}" "out/dist/Image.${{ matrix.variant }}"
+    
       - name: 🔍 Check Space (Post-Build)
         if: always()
         run: |
