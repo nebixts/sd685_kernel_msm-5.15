@@ -650,10 +650,11 @@ jobs:
       - name: "📤 Upload kernel"
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ env.WORK_DIR }}/${{ env.IMAGE_NAME }}
+          name: kernel-${{ matrix.variant }}
+          # Look for the file in the workspace root where you copied it
+          path: ${{ github.workspace }}/Image.${{ matrix.variant }}
           retention-days: 3
-
+          
   Package-Kernels:
     name: "📦 Package kernels"
     runs-on: ubuntu-latest
