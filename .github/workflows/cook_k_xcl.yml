@@ -675,28 +675,28 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
           # 1. Clone matching SUSFS branch
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15 ../susfs
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15 ../susfs4ksu
           
           # 2. Copy core SUSFS files from the NEW 'kernel_patches' location
           # These files are now inside susfs4ksu/kernel_patches/fs/ and include/
-          cp ../susfs/kernel_patches/fs/susfs.c ./KernelSU/kernel/
-          cp ../susfs/kernel_patches/include/linux/susfs.h ./KernelSU/kernel/
-          cp ../susfs/kernel_patches/fs/ksu_susfs.c ./KernelSU/kernel/
-          cp ../susfs/kernel_patches/include/linux/ksu_susfs.h ./KernelSU/kernel/
+          cp ../susfs4ksu/kernel_patches/fs/susfs.c ./KernelSU/kernel/
+          cp ../susfs4ksu/kernel_patches/include/linux/susfs.h ./KernelSU/kernel/
+          cp ../susfs4ksu/kernel_patches/fs/ksu_susfs.c ./KernelSU/kernel/
+          cp ../susfs4ksu/kernel_patches/include/linux/ksu_susfs.h ./KernelSU/kernel/
     
           # 3. Patch KernelSU-Next (Wild KSU Base)
           cd KernelSU
           # Using the Next-specific patch for KernelSU integration
-          patch -p1 < ../../susfs/kernel_patches/Next/10_enable_susfs_for_ksu.patch || true
+          patch -p1 < ../../susfs4ksu/kernel_patches/Next/10_enable_susfs_for_ksu.patch || true
           cd ..
     
           # 4. Patch Kernel Source (GKI 5.15)
           # The main kernel patch is now also inside the kernel_patches folder
-          patch -p1 < ../susfs/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
+          patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
     
           # 5. Copy necessary headers to the actual kernel include directory
-          cp ../susfs/kernel_patches/include/linux/* ./include/linux/
-          cp ../susfs/kernel_patches/fs/* ./fs/
+          cp ../susfs4ksu/kernel_patches/include/linux/* ./include/linux/
+          cp ../susfs4ksu/kernel_patches/fs/* ./fs/
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
