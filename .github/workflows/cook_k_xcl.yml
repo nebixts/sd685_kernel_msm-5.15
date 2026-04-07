@@ -591,10 +591,8 @@ jobs:
           
           git clone -b canary https://github.com/WildKernels/Wild_KSU KernelSU
           cd KernelSU && git checkout 2190b4a9 && cd ..
-          # Integrate into kernel tree
-          curl -LSs "https://githubusercontent.com" | bash -s 2190b4a9
-
-          # curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s 2190b4a9
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s 2190b4a9
+          
           echo "✔ Wild KSU installed successfully"
           
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
@@ -677,8 +675,8 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
           # 1. Clone matching SUSFS branch
-          git clone https://gitlab.com -b gki-android13-5.15 ../susfs
-    
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+          
           # 2. Copy core SUSFS files to KernelSU
           cp ../susfs/kernel/ksu/susfs.c ./KernelSU/kernel/
           cp ../susfs/kernel/ksu/susfs.h ./KernelSU/kernel/
