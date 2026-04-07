@@ -658,7 +658,7 @@ jobs:
           
           # Apply KSU SUSFS patch with better error handling
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          KSU_C_FILE="./KernelSU/kernel/ksu.c"
+          KSU_C_FILE="Wild_KSU/kernel/ksu.c"
           
           if [ ! -f "$KSU_C_FILE" ]; then
             echo "❌ ERROR: $KSU_C_FILE not found!"
@@ -738,7 +738,7 @@ jobs:
           
           # Ensure drivers/kernelsu symlink exists
           if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
+            ln -sf ../Wild_KSU drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
           
