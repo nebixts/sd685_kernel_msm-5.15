@@ -674,7 +674,7 @@ jobs:
             # Try applying patch first
             PATCH_SUCCESS=0
             if [ -f "$KSU_PATCH" ]; then
-              cd KernelSU
+              cd Wild_KSU
               if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
                 patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
                 echo "✔ Applied KSU SUSFS patch successfully"
