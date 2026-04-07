@@ -674,13 +674,6 @@ jobs:
           echo "📦 Installing KernelSU-Next..." 
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
-          # Fix the "Missing Kbuild" Bug
-          # The setup script often misses this file required for SUSFS patching
-          if [ ! -f "KernelSU/kernel/Kbuild" ]; then
-            echo "⚠️ Kbuild missing, downloading manually..."
-            curl -LSs "https://githubusercontent.com" -o KernelSU/kernel/Kbuild
-          fi
-
           echo "📦 Cloning SUSFS4KSU..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
     
@@ -702,10 +695,11 @@ jobs:
           patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU integration patch failed"
           cd ..
           
-          rm -rf susfs4ksu
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
           fi
+
+          rm -rf susfs4ksu
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
