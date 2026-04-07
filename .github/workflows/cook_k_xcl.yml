@@ -1,4 +1,4 @@
-name: "Cook_CLO_CL22d"
+name: "Cook_K_XCL22"
 
 env:
   OUT_DIR: "out"
@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: choice
-        default: "zepharo"
+        default: "codelinaro"
         options:
           - "google"
           - "zepharo"
@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.3-Z-06042026"
+        default: "-NeFaRiaN-3.3-C-07042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -589,7 +589,7 @@ jobs:
           
           echo "📦 Installing Wild KSU..."
 
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s 2190b4a9
       
           echo "✔ Wild KSU installed successfully"
           
@@ -833,7 +833,7 @@ jobs:
           if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
             KSU_INFO="_${{ github.event.inputs.ksuVariant }}"
           fi
-          ZIP_NAME="nefarian-xclang-${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          ZIP_NAME="nefarian-xcl22-${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" ./*
           cd ..
@@ -842,6 +842,6 @@ jobs:
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: NeFaRiaN-XCLang
+          name: NeFaRiaN-XCL22
           path: ${{ env.ZIP_FILENAME }}
           retention-days: 7
