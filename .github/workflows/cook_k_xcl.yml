@@ -691,9 +691,15 @@ jobs:
           fi
           
           echo "🔧 Applying SUSFS -> KernelSU integration patch..."
-          cd KernelSU
-          patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU integration patch failed"
-          cd ..
+          if [ -d "KernelSU" ]; then
+            echo "🔧 Patching KernelSU directory..."
+            cd KernelSU
+            patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+            cd ..
+          else
+            echo "❌ ERROR: KernelSU directory still missing!"
+            exit 1
+          fi
           
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
