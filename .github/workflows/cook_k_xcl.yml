@@ -176,7 +176,8 @@ jobs:
           else
             echo "No swap requested (swapSizeGB=${SWAP_GB})"
           fi
-
+      
+      # ====================== Source Code Preparation Stage ======================
       - name: "🖥️ Clone Kernel Source"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -693,7 +694,7 @@ jobs:
           echo "🔧 Applying SUSFS -> KernelSU integration patch..."
           if [ -d "KernelSU" ]; then
             echo "🔧 Patching KernelSU directory..."
-            cd KernelSU
+            cd ./KernelSU
             patch -p1 < ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
             cd ..
           else
@@ -744,6 +745,7 @@ jobs:
           cd ${{ env.kernelDir }}/${{ env.kernelName }}
           make ${{ steps.generate-args.outputs.args }} ${{ env.DEFCONFIG_NAME }}
 
+      # ====================== Begin Processing Build Kernel Stage ======================
       - name: "🛠️ Build Kernel 🪛"
         run: |
           export TOOLCHAIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
@@ -772,6 +774,7 @@ jobs:
                CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
                KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"
 
+      # ====================== Begin Packaging the Kernel Stage ======================
       - name: "📂 Prepare Artifact"
         run: |
           cd ${{ env.kernelDir }}/${{ env.kernelName }}
