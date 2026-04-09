@@ -547,6 +547,12 @@ jobs:
           else
             echo "⚠️ susfs_def.h not found, might not be needed"
           fi
+
+          # Register in fs/Makefile
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-y += susfs.o" >> fs/Makefile
+          fi
+          echo "✔ Applied Register fs/Makefile successfully"
           
           # Inject SUSFS integration into KernelSU
           echo "📦 Integrating SUSFS with KernelSU..."
@@ -645,9 +651,6 @@ jobs:
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -734,6 +737,12 @@ jobs:
           else
             echo "⚠️ susfs_def.h not found, might not be needed"
           fi
+
+          # Register in fs/Makefile
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-y += susfs.o" >> fs/Makefile
+          fi
+          echo "✔ Applied Register fs/Makefile successfully"
           
           echo "📦 Integrating SUSFS with Wild-KSU..."
           
@@ -822,9 +831,6 @@ jobs:
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -911,6 +917,12 @@ jobs:
           else
             echo "⚠️ susfs_def.h not found, might not be needed"
           fi
+
+          # Register in fs/Makefile
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-y += susfs.o" >> fs/Makefile
+          fi
+          echo "✔ Applied Register fs/Makefile successfully"
           
           echo "📦 Integrating SUSFS with NEXT..."
           
@@ -1000,9 +1012,6 @@ jobs:
           echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
