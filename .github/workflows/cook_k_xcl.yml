@@ -551,9 +551,9 @@ jobs:
           # Inject SUSFS integration into KernelSU
           echo "📦 Integrating SUSFS with KernelSU..."
           
-          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/ || true
-            echo "✔ Copied SUSFS integration files to KernelSU/kernel/"
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/* KernelSU/ || true
+            echo "✔ Copied SUSFS integration files to KernelSU/"
           fi
           
           # Apply KSU SUSFS patch with better error handling
