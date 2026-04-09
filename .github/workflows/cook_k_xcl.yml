@@ -334,7 +334,7 @@ jobs:
               ;;
           esac
         
-          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
+              patch -p1 "https://raw.githubusercontent.com/nebixts/kernel_patches/main/custom_tickrate_options.patch"
           
           case "${{ github.event.inputs.tickRate }}" in
             default)
@@ -593,7 +593,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu ./Wild_KSU
           
           echo "📦 Installing Wild KSU..."
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s dev
           
           if [ ! -d "Wild_KSU" ]; then
             echo "❌ ERROR: Wild_KSU directory not found after installation!"
