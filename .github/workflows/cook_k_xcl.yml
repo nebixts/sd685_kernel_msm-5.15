@@ -558,7 +558,7 @@ jobs:
           
           # Apply KSU SUSFS patch with better error handling
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          KSU_C_FILE="KernelSU/kernel/ksu.c"
+          KSU_C_FILE="KernelSU/ksu.c"
           
           if [ ! -f "$KSU_C_FILE" ]; then
             echo "❌ ERROR: $KSU_C_FILE not found!"
@@ -854,12 +854,12 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          rm -rf ./KernelSU ./drivers/kernelsu
+          rm -rf ./KernelSU ./drivers/kernelsu ./KernelSU-Next
           
           echo "📦 Installing KernelSU-Next..." 
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
 
-            if [ ! -d "KernelSU" ]; then
+            if [ ! -d "KernelSU-Next" ]; then
             echo "❌ ERROR: KernelSU-Next directory not found after installation!"
             exit 1
           fi
@@ -920,7 +920,7 @@ jobs:
           fi
           
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          KSU_C_FILE="KernelSU/kernel/ksu.c"
+          KSU_C_FILE="KernelSU-Next/ksu.c"
           
           if [ ! -f "$KSU_C_FILE" ]; then
             echo "❌ ERROR: $KSU_C_FILE not found!"
@@ -934,7 +934,7 @@ jobs:
           else
             PATCH_SUCCESS=0
             if [ -f "$KSU_PATCH" ]; then
-              cd KernelSU
+              cd KernelSU-Next
               if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
                 patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
                 echo "✔ Applied KSU SUSFS patch successfully"
