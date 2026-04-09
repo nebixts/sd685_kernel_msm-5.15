@@ -506,6 +506,8 @@ jobs:
           echo "📄 Installing SUSFS source files..."
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+          echo "✔ Copied SUSFS source files Successfully"
     
           echo "🔧 Registering SUSFS in fs/Makefile..."
           if ! grep -q "susfs.o" fs/Makefile; then
