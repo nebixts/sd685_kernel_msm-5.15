@@ -513,18 +513,38 @@ jobs:
           fi
     
           echo "📦 Integrating SUSFS with KernelSU..."
-          cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/ || true
     
-          KSU_C_FILE="KernelSU/kernel/ksu.c"
-          # Inject Header at top
+          # 1. Find where ksu.c actually is (it might be in KernelSU/kernel/ksu.c)
+          KSU_C_FILE=$(find KernelSU -name "ksu.c")
+          KSU_DIR=$(dirname "$KSU_C_FILE")
+
+          if [ -z "$KSU_C_FILE" ]; then
+          echo "❌ ERROR: Could not find ksu.c in KernelSU directory!"
+          ls -R KernelSU
+          exit 1
+          fi
+          echo "✔ Found ksu.c at: $KSU_C_FILE"
+
+          # 2. Copy SUSFS integration files to the correct KSU kernel folder
+          # We use the folder containing ksu.c as the target
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+          cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_DIR/" || true
+          echo "✔ Copied SUSFS integration files to $KSU_DIR"
+          fi
+    
+          # 3. Inject Header
+          if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
           sed -i '1i #include <linux/susfs.h>' "$KSU_C_FILE"
+          echo "✔ Injected susfs.h into $KSU_C_FILE"
+          fi
     
-          # Inject Init Call before the return in ksu_init
+          # 4. Inject Init Call into ksu_init
           if ! grep -q "susfs_init()" "$KSU_C_FILE"; then
+          # More robust sed: search for ksu_init function and insert before its return
           sed -i '/ksu_init/,/}/ s/return 0;/    susfs_init();\n    return 0;/' "$KSU_C_FILE"
           echo "✔ Injected susfs_init() into ksu_init"
           fi
-    
+
           # Link KSU to drivers
           mkdir -p drivers
           ln -sf ../KernelSU drivers/kernelsu
