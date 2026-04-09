@@ -511,45 +511,25 @@ jobs:
           if ! grep -q "susfs.o" fs/Makefile; then
           echo "obj-y += susfs.o" >> fs/Makefile
           fi
+          echo "✔ Applied Register fs/Makefile successfully"
     
           echo "📦 Integrating SUSFS with KernelSU..."
     
           # In newer KSU, the file is at KernelSU/kernel/ksu.c
-          KSU_C_FILE="KernelSU/kernel/ksu.c"
-
-          if [ ! -f "$KSU_C_FILE" ]; then
-          echo "❌ ERROR: $KSU_C_FILE not found! Trying to find it..."
-          KSU_C_FILE=$(find . -name "ksu.c" | grep "KernelSU" | head -n 1)
-          fi
-
-          if [ -z "$KSU_C_FILE" ] || [ ! -f "$KSU_C_FILE" ]; then
-          echo "❌ FATAL: Could not locate ksu.c"
-          exit 1
-          fi
-    
-          echo "✔ Found ksu.c at: $KSU_C_FILE"
-          KSU_DIR=$(dirname "$KSU_C_FILE")
-
-          # 1. Copy SUSFS integration files
-          # Note: susfs4ksu repo structure usually has 'KernelSU/kernel' or 'kernel'
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-          cp -f susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_DIR/" || true
-          echo "✔ Copied SUSFS integration files to $KSU_DIR"
-          elif [ -d "susfs4ksu/kernel_patches/KernelSU" ]; then
-          cp -rf susfs4ksu/kernel_patches/KernelSU/* "$KSU_DIR/" || true
+          cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/ || true
+          echo "✔ Copied SUSFS integration files to KernelSU/kernel/"
           fi
-    
-          # 2. Inject Header
-          if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
-          sed -i '1i #include <linux/susfs.h>' "$KSU_C_FILE"
-          echo "✔ Injected susfs.h"
+          
+          echo "🔧 Applying KSU SUSFS patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          if [ -f "$KSU_PATCH" ]; then
+          cd KernelSU
+          if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
+          patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
+          echo "✔ Applied KSU SUSFS patch successfully"
           fi
-    
-          # 3. Inject Init Call (Simplified for ksu.c)
-          if ! grep -q "susfs_init()" "$KSU_C_FILE"; then
-          # Target the end of ksu_init or ksu_core_init
-          sed -i '/return 0;/i \    susfs_init();' "$KSU_C_FILE"
-          echo "✔ Injected susfs_init()"
+          cd ..
           fi
 
           # Link KSU to drivers
