@@ -529,11 +529,6 @@ jobs:
           else
             echo "⚠️ susfs_def.h not found in repo"
           fi
-          
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
 
           # Register in fs/Makefile
           if ! grep -q "susfs.o" fs/Makefile; then
@@ -541,11 +536,17 @@ jobs:
           fi
           echo "✔ Applied Register fs/Makefile successfully"
           
-          if [ ! -L "drivers/kernelsu" ]; then
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
+
+          if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
             ln -sf ../KernelSU drivers/kernelsu
-            echo "✔ Created drivers/kernelsu symlink"
+            echo "✔ Created drivers/kernelsu symlink successfully"
           fi
 
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KPROBES=y
