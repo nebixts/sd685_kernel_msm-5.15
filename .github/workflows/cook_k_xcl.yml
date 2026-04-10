@@ -541,7 +541,6 @@ jobs:
           fi
           echo "✔ Applied Register fs/Makefile successfully"
           
-
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
