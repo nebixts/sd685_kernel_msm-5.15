@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.4-C-10042026"
+        default: "-NeFaRiaN-3.4-C-13042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -91,7 +91,7 @@ on:
       
 jobs:
   Build-Kernel:
-    name: "🚀 Build Kernel"
+    name: "🧰 Building Kernel 🛠️"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -487,7 +487,7 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
       # ====================== Begin Processing Root Kernel  base of KernelSU Stage ======================
-      - name: "🔧 Setup KernelSU with SUSFS"
+      - name: "🛠️ Setup KernelSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KERNELSU'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -584,7 +584,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu ./Wild_KSU
           
           echo "📦 Installing Wild KSU..."
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary 2190b4a
           
           if [ ! -d "Wild_KSU" ]; then
             echo "❌ ERROR: Wild_KSU directory not found after installation!"
