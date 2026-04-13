@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.4-C-13042026"
+        default: "-NeFaRiaN-3.4-C-14042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -89,7 +89,7 @@ on:
         type: string
         default: "8"
       lz4kd:
-        description: "enable or disable lz4kd"
+        description: "enable or disable zram lz4kd compression"
         required: false
         type: choice
         default: "off"
@@ -195,7 +195,7 @@ jobs:
 
       - name: "⚙️ Initialize Toolchains Repo"
         run: |
-          set -e  # Exit on errors
+          set -e
       
           get_latest_github_release() {
             local repo_url="$1"
@@ -495,20 +495,18 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
       - name: "🔧 Add ZRAM LZ4KD"
-        if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo "Adding ZRAM...";
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
          
           if [ "${{ github.event.inputs.LZ4KD }}" == "On" ]; then
-            # Copy lz4kd
-            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
-            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
-            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypt
+            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux
+            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./lib
+            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto
           fi
          
-          echo "🔧 Apply patched..."
+          echo "🔧 Applying patched..."
          
           if [ "${{ github.event.inputs.lz4kd }}" == "On" ]; then
             echo "🚀 apply lz4kd patch..."
@@ -518,8 +516,8 @@ jobs:
 
           if [ "${{ github.event.inputs.lz4kd }}" == "On" ]; then
             echo "📦 enable lz4kd compression..."
-            echo "CONFIG_CRYPTO_LZ4KD=y" >> ./common/arch/arm64/configs/gki_defconfig
-            echo "CONFIG_ZRAM_WRITEBACK=y" >> ./common/arch/arm64/configs/gki_defconfig
+            echo "CONFIG_CRYPTO_LZ4KD=y" >> ./arch/arm64/configs/gki_defconfig
+            echo "CONFIG_ZRAM_WRITEBACK=y" >> ./arch/arm64/configs/gki_defconfig
           fi
           
           echo "✅ Patching ZRAM applied successfully"
