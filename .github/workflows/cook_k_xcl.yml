@@ -88,7 +88,15 @@ on:
         required: false
         type: string
         default: "8"
-      
+      lz4kd:
+        description: "enable or disable lz4kd"
+        required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+          
 jobs:
   Build-Kernel:
     name: "🧰 Building Kernel 🛠️"
@@ -486,6 +494,30 @@ jobs:
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
+      - name: "🔧 Add ZRAM LZ4KD"
+        if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Adding ZRAM...";
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+         
+          if [ "${{ github.event.inputs.LZ4KD }}" == "On" ]; then
+            # Copy lz4kd
+            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
+            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
+            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypt
+          fi
+         
+          echo "🔧 Apply patched..."
+         
+          if [ "${{ github.event.inputs.lz4kd }}" == "On" ]; then
+            echo "🚀 apply lz4kd patch..."
+            cp ../../SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
+            patch -p1 -F 3 < lz4kd.patch || true
+          fi
+          
+          echo "✅ Patching ZRAM applied successfully"
+     
       # ====================== Begin Processing Root Kernel  base of KernelSU Stage ======================
       - name: "🛠️ Setup KernelSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KERNELSU'
