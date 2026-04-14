@@ -625,7 +625,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu ./Wild_KSU
           
           echo "📦 Installing Wild KSU..."
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary 2190b4a
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
           
           if [ ! -d "Wild_KSU" ]; then
             echo "❌ ERROR: Wild_KSU directory not found after installation!"
@@ -804,65 +804,28 @@ jobs:
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -e   
-          # 1. Clean up old remains
-          rm -rf ./KernelSU ./drivers/kernelsu ./KernelSU-Next susfs4ksu
+          set -e 
     
           echo "📦 Installing KernelSU-Next (dev)..." 
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
-
-          # FIND THE KSU SOURCE DIR (it might be KernelSU-Next or KernelSU)
-          KSU_DIR=$(find . -maxdepth 1 -type d -name "KernelSU*" | head -n 1)
-          echo "📍 KSU Source found at: $KSU_DIR"
-
-          echo "📦 Cloning SUSFS4KSU (gki-android13-5.15)..."
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-    
-          echo "🔧 Applying SUSFS kernel patch..."
-          SUSFS_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          if [ -f "$SUSFS_PATCH" ]; then
-            patch -p1 --forward < "$SUSFS_PATCH" || echo "⚠️ Patch had minor conflicts, proceeding..."
-          fi
-    
-          echo "📄 Installing SUSFS source files..."
-          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          # susfs_def.h is often required for newer 5.15 builds
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h 2>/dev/null || true
-
-          # Register in fs/Makefile
-          if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-$(CONFIG_KSU_SUSFS) += susfs.o" >> fs/Makefile
-          fi
-    
-          echo "📦 Integrating SUSFS with NEXT..."
-          # use 'KernelSU' and others use 'ksu' in their patch folder names.
-          SUSFS_KSU_PATCH_DIR=$(find susfs4ksu/kernel_patches -type d -name "kernel" | grep "KernelSU" | head -n 1)
-          if [ -d "$SUSFS_KSU_PATCH_DIR" ]; then
-            cp -rf "$SUSFS_KSU_PATCH_DIR"/* "$KSU_DIR/kernel/"
-            echo "✔ Copied integration files"
-          fi
+          echo "✔ KernelSU-Next installed successfully"
           
-          # 2. FIND KSU.C (Path is often $KSU_DIR/kernel/ksu.c)
-          KSU_C_FILE=$(find "$KSU_DIR" -name "ksu.c")
-          echo "📍 ksu.c found at: $KSU_C_FILE"
-    
-          if [ -z "$KSU_C_FILE" ]; then
-            echo "❌ ERROR: Could not find ksu.c!"
-            exit 1
-          fi
-
-          if ! grep -q "susfs_init" "$KSU_C_FILE"; then
-            echo "🔧 Patching $KSU_C_FILE"
-          # Add include
-          sed -i '1,/#include/ { /#include/ s/$/\n#include <linux\/susfs.h>/ }' "$KSU_C_FILE"
-          # Add init call before return
-          sed -i '/return 0;/i \	susfs_init();' "$KSU_C_FILE"
-          fi
-    
-          echo "🔗 Linking drivers/kernelsu..."
-          mkdir -p drivers
-          ln -sf "../$KSU_DIR" drivers/kernelsu
+          echo "📦 Cloning SUSFS4KSU (gki-android13-5.15)..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15 susfs4ksu
+          echo "✔ Cloning SUSFS4KSU successfully"
+          
+          echo "📄 Installing SUSFS source files..."    
+          # Copy SuSFS files to kernel tree
+          cp susfs4ksu/kernel_patches/fs/susfs.c fs/
+          cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
+          echo "✔ Copied SUSFS source files successfully"
+          
+          # Apply Patches (Ensure paths match your kernel tree)
+          patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch
+          echo "✔ SUSFS kernel patch applied successfully"
+          
+          patch -p1 < susfs4ksu/kernel_patches/KernelSU/Next/0001-KernelSU-Next-Implement-SuSFS-v2.1.0-support.patch
+          echo "✔ Applied KSU SUSFS patch successfully"
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
