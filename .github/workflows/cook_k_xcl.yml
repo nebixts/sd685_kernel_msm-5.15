@@ -812,24 +812,142 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           echo "✔ KernelSU-Next installed successfully"
           
-          echo "📦 Cloning SUSFS4KSU (gki-android13-5.15)..."
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15 susfs4ksu
-          echo "✔ Cloning SUSFS4KSU successfully"
+          if [ ! -d "KernelSU" ]; then
+            echo "❌ ERROR: KernelSU directory not found after installation!"
+            exit 1
+          fi
+          echo "✔ NEXT installed successfully"
           
-          echo "📄 Installing SUSFS source files..."    
-          # Copy SuSFS files to kernel tree
-          cp susfs4ksu/kernel_patches/fs/susfs.c fs/
-          cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
-          cp susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
-          echo "✔ Copied SUSFS source files successfully"
+          echo "📦 Cloning SUSFS4KSU..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
           
-          # Apply Patches (Ensure paths match your kernel tree)
-          patch -p1 --forward < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch
-          echo "✔ SUSFS kernel patch applied successfully"
+          if [ ! -d "susfs4ksu" ]; then
+            echo "❌ ERROR: SUSFS4KSU clone failed!"
+            exit 1
+          fi
           
-          cd KernelSU
-          patch -p1 --forward < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
-          echo "✔ Applied KSU SUSFS patch successfully"
+          echo "🔧 Applying SUSFS kernel patch..."
+          SUSFS_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          
+          if [ -f "$SUSFS_PATCH" ]; then
+            if patch -p1 --forward < "$SUSFS_PATCH"; then
+              echo "✅ SUSFS kernel patch applied successfully"
+            else
+              echo "⚠️ Patch had some issues, but continuing..."
+            fi
+          else
+            echo "⚠️ SUSFS patch file not found: $SUSFS_PATCH"
+          fi
+          
+          echo "📄 Installing SUSFS source files..."
+          mkdir -p fs include/linux
+          
+          if [ -f "susfs4ksu/kernel_patches/fs/susfs.c" ]; then
+            cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+            echo "✔ Copied fs/susfs.c"
+          else
+            echo "❌ ERROR: fs/susfs.c not found in SUSFS repo!"
+            exit 1
+          fi
+          
+          if [ -f "susfs4ksu/kernel_patches/include/linux/susfs.h" ]; then
+            cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+            echo "✔ Copied include/linux/susfs.h"
+          else
+            echo "❌ ERROR: include/linux/susfs.h not found!"
+            exit 1
+          fi
+          
+          if [ -f "susfs4ksu/kernel_patches/include/linux/susfs_def.h" ]; then
+            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+            echo "✔ Copied include/linux/susfs_def.h"
+          else
+            echo "⚠️ susfs_def.h not found, might not be needed"
+          fi
+
+          # Register in fs/Makefile
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-y += susfs.o" >> fs/Makefile
+          fi
+          echo "✔ Applied Register fs/Makefile successfully"
+          
+          echo "📦 Integrating SUSFS with NEXT..."
+          
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/ || true
+            echo "✔ Copied SUSFS integration files to KernelSU/kernel/"
+          fi
+          
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          KSU_C_FILE="KernelSU/kernel/ksu.c"
+          
+          if [ ! -f "$KSU_C_FILE" ]; then
+            echo "❌ ERROR: $KSU_C_FILE not found!"
+            exit 1
+          fi
+          
+          echo "🔧 Integrating SUSFS into KSU initialization..."
+          
+          if grep -q "susfs_init" "$KSU_C_FILE" 2>/dev/null; then
+            echo "⚠️ SUSFS already integrated in ksu.c, skipping"
+          else
+            PATCH_SUCCESS=0
+            if [ -f "$KSU_PATCH" ]; then
+              cd KernelSU
+              if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
+                patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
+                echo "✔ Applied KSU SUSFS patch successfully"
+              fi
+              cd ..
+            fi
+            
+            if [ $PATCH_SUCCESS -eq 0 ]; then
+              echo "⚠️ Patch failed or unavailable, applying manual integration..."
+              
+              if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
+                sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
+                echo "✔ Added #include <linux/susfs.h>"
+              fi
+              
+              if ! grep -q "susfs_init()" "$KSU_C_FILE"; then
+                sed -i '/ksu_core_init();/a \\tsusfs_init();' "$KSU_C_FILE" || \
+                sed -i '/int __init ksu_init(/,/^}/{ /return 0;/i \\tsusfs_init(); }' "$KSU_C_FILE"
+                echo "✔ Added susfs_init() call"
+              fi
+            fi
+          fi
+          
+          echo "🔍 Verifying SUSFS integration..."
+          VERIFICATION_FAILED=0
+          
+          for file in fs/susfs.c include/linux/susfs.h; do
+            if [ -f "$file" ]; then
+              echo "✔ Found: $file"
+            else
+              echo "❌ MISSING: $file"
+              VERIFICATION_FAILED=1
+            fi
+          done
+          
+          if grep -q "susfs_init" "$KSU_C_FILE"; then
+            echo "✔ susfs_init() call verified in ksu.c"
+          else
+            echo "❌ MISSING: susfs_init() call in ksu.c"
+            VERIFICATION_FAILED=1
+          fi
+          
+          if grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
+            echo "✔ susfs.h include verified in ksu.c"
+          else
+            echo "❌ MISSING: susfs.h include in ksu.c"
+            VERIFICATION_FAILED=1
+          fi
+          
+          if [ $VERIFICATION_FAILED -eq 1 ]; then
+            echo "❌ SUSFS integration verification FAILED!"
+            echo "Dumping ksu.c header for debugging:"
+            head -30 "$KSU_C_FILE"
+            exit 1
 
           if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
             ln -sf ../KernelSU drivers/kernelsu
