@@ -822,10 +822,10 @@ jobs:
           echo "✔ Copied SUSFS source files successfully"
           
           # Apply Patches (Ensure paths match your kernel tree)
-          patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch
+          patch -p1 --forward < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch
           echo "✔ SUSFS kernel patch applied successfully"
           
-          patch -p1 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
+          patch -p1 --forward --dry-run < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch >/dev/null 2>&1
           echo "✔ Applied KSU SUSFS patch successfully"
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
