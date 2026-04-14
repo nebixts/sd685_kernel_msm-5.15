@@ -513,6 +513,7 @@ jobs:
           echo "🔧 Applying patched..."
          
           echo "🚀 apply lz4kd 5.15 patch..."
+          cd ./common
             cp ../../SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
             patch -p1 -F 3 < lz4kd.patch || true
           echo "✔ Applied lz4kd patch successfully"
