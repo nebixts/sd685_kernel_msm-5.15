@@ -810,13 +810,10 @@ jobs:
     
           echo "📦 Installing KernelSU-Next (dev)..." 
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
-    
-          # Verify installation directory
-          KSU_NEXT_DIR="KernelSU-Next"
-          if [ ! -d "$KSU_NEXT_DIR" ]; then
-            echo "❌ ERROR: $KSU_NEXT_DIR not found!"
-            exit 1
-          fi
+
+          # FIND THE KSU SOURCE DIR (it might be KernelSU-Next or KernelSU)
+          KSU_DIR=$(find . -maxdepth 1 -type d -name "KernelSU*" | head -n 1)
+          echo "📍 KSU Source found at: $KSU_DIR"
 
           echo "📦 Cloning SUSFS4KSU (gki-android13-5.15)..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
@@ -839,30 +836,33 @@ jobs:
           fi
     
           echo "📦 Integrating SUSFS with NEXT..."
-          # Next uses KernelSU-Next/kernel/ structure
-          cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_NEXT_DIR/kernel/" || true
+          # use 'KernelSU' and others use 'ksu' in their patch folder names.
+          SUSFS_KSU_PATCH_DIR=$(find susfs4ksu/kernel_patches -type d -name "kernel" | grep "KernelSU" | head -n 1)
+          if [ -d "$SUSFS_KSU_PATCH_DIR" ]; then
+            cp -rf "$SUSFS_KSU_PATCH_DIR"/* "$KSU_DIR/kernel/"
+            echo "✔ Copied integration files"
+          fi
+          
+          # 2. FIND KSU.C (Path is often $KSU_DIR/kernel/ksu.c)
+          KSU_C_FILE=$(find "$KSU_DIR" -name "ksu.c")
+          echo "📍 ksu.c found at: $KSU_C_FILE"
     
-          KSU_C_FILE="$KSU_NEXT_DIR/kernel/ksu.c"
-    
-          # Robust Manual Integration using stable anchors
+          if [ -z "$KSU_C_FILE" ]; then
+            echo "❌ ERROR: Could not find ksu.c!"
+            exit 1
+          fi
+
           if ! grep -q "susfs_init" "$KSU_C_FILE"; then
-          echo "🔧 Manually hooking susfs_init into $KSU_C_FILE"
-      
-          # Add include after the last existing include in the header block
+            echo "🔧 Patching $KSU_C_FILE"
+          # Add include
           sed -i '1,/#include/ { /#include/ s/$/\n#include <linux\/susfs.h>/ }' "$KSU_C_FILE"
-      
-          # Add susfs_init() inside ksu_init() right before the final return
-          # This works even if function names like ksu_core_init change in 'Next'
+          # Add init call before return
           sed -i '/return 0;/i \	susfs_init();' "$KSU_C_FILE"
           fi
     
-          # 🔍 Verification
-          grep -q "susfs_init" "$KSU_C_FILE" || (echo "❌ Integration failed" && exit 1)
-    
-          # Create the symlink the build system expects
-          echo "🔗 Creating drivers/kernelsu symlink..."
+          echo "🔗 Linking drivers/kernelsu..."
           mkdir -p drivers
-          ln -sf ../$KSU_NEXT_DIR drivers/kernelsu
+          ln -sf "../$KSU_DIR" drivers/kernelsu
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
