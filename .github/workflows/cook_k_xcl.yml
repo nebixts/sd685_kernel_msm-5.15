@@ -93,7 +93,7 @@ on:
         description: "enable or disable zram lz4kd compression"
         required: false
         type: choice
-        default: "off"
+        default: "on"
         options:
           - "on"
           - "off"
@@ -496,34 +496,30 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
       - name: "🔧 Add ZRAM LZ4KD"
+        if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo "Adding ZRAM..."
           
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           echo "✔ Applied git successfully"
-        
-          if [ "${{ github.event.inputs.lz4kd }}" == "on" ]; then
+
+          echo "🚀 apply lz4kd patch..."
             cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux
             cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./lib
             cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto
-          fi
-          echo "✔ Applied Copying successfully"
+          echo "✔ Applied Copying Files successfully"
          
           echo "🔧 Applying patched..."
          
-          if [ "${{ github.event.inputs.lz4kd }}" == "on" ]; then
-            echo "🚀 apply lz4kd patch..."
+          echo "🚀 apply lz4kd 5.15 patch..."
             cp ../../SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
             patch -p1 -F 3 < lz4kd.patch || true
-          fi
           echo "✔ Applied lz4kd patch successfully"
 
-          if [ "${{ github.event.inputs.lz4kd }}" == "on" ]; then
-            echo "📦 enable lz4kd compression..."
-            echo "CONFIG_CRYPTO_LZ4KD=y" >> ./arch/arm64/configs/gki_defconfig
-            echo "CONFIG_ZRAM_WRITEBACK=y" >> ./arch/arm64/configs/gki_defconfig
-          fi
+          echo "📦 enable lz4kd compression..."
+          echo "CONFIG_CRYPTO_LZ4KD=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ZRAM_WRITEBACK=y" >> ./arch/arm64/configs/gki_defconfig
           echo "✔ Applied Config successfully"
           
           echo "✅ Patching ZRAM applied successfully"
@@ -626,7 +622,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu ./Wild_KSU
           
           echo "📦 Installing Wild KSU..."
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s dev
           
           if [ ! -d "Wild_KSU" ]; then
             echo "❌ ERROR: Wild_KSU directory not found after installation!"
@@ -806,13 +802,13 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          rm -rf ./KernelSU ./drivers/kernelsu
+          rm -rf ./KernelSU ./drivers/kernelsu ./KernelSU-Next
     
           echo "📦 Installing KernelSU-Next (dev)..." 
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           echo "✔ KernelSU-Next installed successfully"
           
-          if [ ! -d "KernelSU" ]; then
+          if [ ! -d "KernelSU-Next" ]; then
             echo "❌ ERROR: KernelSU directory not found after installation!"
             exit 1
           fi
@@ -874,12 +870,12 @@ jobs:
           echo "📦 Integrating SUSFS with NEXT..."
           
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/ || true
-            echo "✔ Copied SUSFS integration files to KernelSU/kernel/"
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU-Next/kernel/ || true
+            echo "✔ Copied SUSFS integration files to KernelSU-Next/kernel/"
           fi
           
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          KSU_C_FILE="KernelSU/kernel/ksu.c"
+          KSU_C_FILE="KernelSU-Next/kernel/ksu.c"
           
           if [ ! -f "$KSU_C_FILE" ]; then
             echo "❌ ERROR: $KSU_C_FILE not found!"
@@ -893,7 +889,7 @@ jobs:
           else
             PATCH_SUCCESS=0
             if [ -f "$KSU_PATCH" ]; then
-              cd KernelSU
+              cd KernelSU-Next
               if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
                 patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
                 echo "✔ Applied KSU SUSFS patch successfully"
@@ -950,7 +946,7 @@ jobs:
             exit 1
 
           if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
+            ln -sf ../KernelSU-Next drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
           
