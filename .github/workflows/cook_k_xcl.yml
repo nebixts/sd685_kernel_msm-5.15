@@ -818,13 +818,14 @@ jobs:
           # Copy SuSFS files to kernel tree
           cp susfs4ksu/kernel_patches/fs/susfs.c fs/
           cp susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
+          cp susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
           echo "✔ Copied SUSFS source files successfully"
           
           # Apply Patches (Ensure paths match your kernel tree)
           patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch
           echo "✔ SUSFS kernel patch applied successfully"
           
-          patch -p1 < susfs4ksu/kernel_patches/KernelSU/Next/0001-KernelSU-Next-Implement-SuSFS-v2.1.0-support.patch
+          patch -p1 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
           echo "✔ Applied KSU SUSFS patch successfully"
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
