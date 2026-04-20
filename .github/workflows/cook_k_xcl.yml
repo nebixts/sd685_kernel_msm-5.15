@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.4-C-14042026"
+        default: "-NeFaRiaN-3.4-C-20042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "NEXT"
+        default: "WKSU"
         options:
           - "KERNELSU"
           - "WKSU"
@@ -93,7 +93,7 @@ on:
         description: "enable or disable zram lz4kd compression"
         required: false
         type: choice
-        default: "on"
+        default: "off"
         options:
           - "on"
           - "off"
@@ -623,7 +623,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu ./Wild_KSU
           
           echo "📦 Installing Wild KSU..."
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s dev
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
           
           if [ ! -d "Wild_KSU" ]; then
             echo "❌ ERROR: Wild_KSU directory not found after installation!"
