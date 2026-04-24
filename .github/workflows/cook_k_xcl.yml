@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.4-C-20042026"
+        default: "-NeFaRiaN-3.4-C-25042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -875,7 +875,6 @@ jobs:
             echo "✔ Copied SUSFS integration files to KernelSU-Next/kernel/"
           fi
           
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           KSU_C_FILE="KernelSU-Next/kernel/ksu.c"
           
           if [ ! -f "$KSU_C_FILE" ]; then
@@ -884,23 +883,7 @@ jobs:
           fi
           
           echo "🔧 Integrating SUSFS into KSU initialization..."
-          
-          if grep -q "susfs_init" "$KSU_C_FILE" 2>/dev/null; then
-            echo "⚠️ SUSFS already integrated in ksu.c, skipping"
-          else
-            PATCH_SUCCESS=0
-            if [ -f "$KSU_PATCH" ]; then
-              cd KernelSU-Next
-              if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
-                patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
-                echo "✔ Applied KSU SUSFS patch successfully"
-              fi
-              cd ..
-            fi
             
-            if [ $PATCH_SUCCESS -eq 0 ]; then
-              echo "⚠️ Patch failed or unavailable, applying manual integration..."
-              
               if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
                 sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
                 echo "✔ Added #include <linux/susfs.h>"
