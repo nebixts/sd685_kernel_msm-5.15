@@ -875,14 +875,8 @@ jobs:
             echo "✔ Copied SUSFS integration files to KernelSU-Next/kernel/"
           fi
           
-          KSU_C_FILE="KernelSU-Next/kernel/ksu.c"
-          
-          if [ ! -f "$KSU_C_FILE" ]; then
-            echo "❌ ERROR: $KSU_C_FILE not found!"
-            exit 1
-          fi
-          
           echo "🔧 Integrating SUSFS into KSU initialization..."
+            KSU_C_FILE="KernelSU-Next/kernel/ksu.c"
             
               if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
                 sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
