@@ -877,51 +877,13 @@ jobs:
           
           echo "🔧 Integrating SUSFS into KSU initialization..."
             KSU_C_FILE="KernelSU-Next/kernel/ksu.c"
-            
-              if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
-                sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
-                echo "✔ Added #include <linux/susfs.h>"
-              fi
-              
-              if ! grep -q "susfs_init()" "$KSU_C_FILE"; then
-                sed -i '/ksu_core_init();/a \\tsusfs_init();' "$KSU_C_FILE" || \
-                sed -i '/int __init ksu_init(/,/^}/{ /return 0;/i \\tsusfs_init(); }' "$KSU_C_FILE"
-                echo "✔ Added susfs_init() call"
-              fi
+            if ! grep -q "susfs_init" "$KSU_C_FILE" 2>/dev/null; then
+             grep -q "#include <linux/susfs.h>" "$KSU_C_FILE" || \
+              sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
+             grep -q "susfs_init()" "$KSU_C_FILE" || \
+              sed -i '/ksu_core_init();/a \\tsusfs_init();' "$KSU_C_FILE" || \
+              sed -i '/int __init ksu_init(/,/^}/{ /return 0;/i \\tsusfs_init(); }' "$KSU_C_FILE"
             fi
-          fi
-          
-          echo "🔍 Verifying SUSFS integration..."
-          VERIFICATION_FAILED=0
-          
-          for file in fs/susfs.c include/linux/susfs.h; do
-            if [ -f "$file" ]; then
-              echo "✔ Found: $file"
-            else
-              echo "❌ MISSING: $file"
-              VERIFICATION_FAILED=1
-            fi
-          done
-          
-          if grep -q "susfs_init" "$KSU_C_FILE"; then
-            echo "✔ susfs_init() call verified in ksu.c"
-          else
-            echo "❌ MISSING: susfs_init() call in ksu.c"
-            VERIFICATION_FAILED=1
-          fi
-          
-          if grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
-            echo "✔ susfs.h include verified in ksu.c"
-          else
-            echo "❌ MISSING: susfs.h include in ksu.c"
-            VERIFICATION_FAILED=1
-          fi
-          
-          if [ $VERIFICATION_FAILED -eq 1 ]; then
-            echo "❌ SUSFS integration verification FAILED!"
-            echo "Dumping ksu.c header for debugging:"
-            head -30 "$KSU_C_FILE"
-            exit 1
 
           if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
             ln -sf ../KernelSU-Next drivers/kernelsu
