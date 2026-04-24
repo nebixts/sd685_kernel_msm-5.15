@@ -875,15 +875,10 @@ jobs:
             echo "✔ Copied SUSFS integration files to KernelSU-Next/kernel/"
           fi
           
-          echo "🔧 Integrating SUSFS into KSU initialization..."
-            KSU_C_FILE="KernelSU-Next/kernel/ksu.c"
-            if ! grep -q "susfs_init" "$KSU_C_FILE" 2>/dev/null; then
-             grep -q "#include <linux/susfs.h>" "$KSU_C_FILE" || \
-              sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
-             grep -q "susfs_init()" "$KSU_C_FILE" || \
-              sed -i '/ksu_core_init();/a \\tsusfs_init();' "$KSU_C_FILE" || \
-              sed -i '/int __init ksu_init(/,/^}/{ /return 0;/i \\tsusfs_init(); }' "$KSU_C_FILE"
-            fi
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
 
           if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
             ln -sf ../KernelSU-Next drivers/kernelsu
