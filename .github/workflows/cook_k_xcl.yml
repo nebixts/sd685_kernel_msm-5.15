@@ -828,7 +828,7 @@ jobs:
           fi
           
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          patch p1 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+          patch p1 -F 3 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
           
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
