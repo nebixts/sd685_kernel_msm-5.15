@@ -625,10 +625,11 @@ jobs:
           echo "📦 Installing Wild KSU..."
           curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
           
-          if [ ! -d "Wild_KSU" ]; then
-            echo "❌ ERROR: Wild_KSU directory not found after installation!"
-            exit 1
-          fi
+          cd Wild_KSU
+          KSU_VERSION=$(expr $(curl -sI "https://api.github.com/repos/WildKernels/Wild_KSU/commits?sha=canary&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p') "+" 33219)
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          sed -i "s/DKSU_VERSION=11998/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
+
           echo "✔ Wild-KSU installed successfully"
           
           echo "📦 Cloning SUSFS4KSU..."
