@@ -864,8 +864,8 @@ jobs:
             echo "⚠️ susfs_def.h not found, might not be needed"
           fi
 
-          cd ./common
-          cp kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./common/
+          cd KernelSU-Next
+          cp kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./KernelSU-Next/
           echo "📦 Manual_Hook..."
             patch -p1 -F 3 < scope_min_manual_hooks_v1.9.patch
           fi
