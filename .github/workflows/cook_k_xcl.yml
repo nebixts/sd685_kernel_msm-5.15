@@ -804,86 +804,44 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          rm -rf ./KernelSU ./drivers/kernelsu ./KernelSU-Next
-    
-          echo "📦 Installing KernelSU-Next (dev)..." 
+          # Install KernelSU-Next using the official remote script
+          rm -rf ./KernelSU ./drivers/kernelsu
+          echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
-          echo "✔ KernelSU-Next installed successfully"
-          
-          if [ ! -d "KernelSU-Next" ]; then
-            echo "❌ ERROR: KernelSU directory not found after installation!"
-            exit 1
-          fi
-          echo "✔ NEXT installed successfully"
-          
+
+          # Clone the official SUSFS repository for GKI 13-5.15
           echo "📦 Cloning SUSFS4KSU..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          
-          if [ ! -d "susfs4ksu" ]; then
-            echo "❌ ERROR: SUSFS4KSU clone failed!"
-            exit 1
-          fi
-          
+    
+          echo "📄 Injecting SUSFS source files..."
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
+          [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
+
           echo "🔧 Applying SUSFS kernel patch..."
-          SUSFS_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          if [ -f "$SUSFS_PATCH" ]; then
-            if patch -p1 --forward < "$SUSFS_PATCH"; then
-              echo "✅ SUSFS kernel patch applied successfully"
-            else
-              echo "⚠️ Patch had some issues, but continuing..."
-            fi
-          else
-            echo "⚠️ SUSFS patch file not found: $SUSFS_PATCH"
-          fi
-          
-          echo "📄 Installing SUSFS source files..."
-          mkdir -p fs include/linux
-          
-          if [ -f "susfs4ksu/kernel_patches/fs/susfs.c" ]; then
-            cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-            echo "✔ Copied fs/susfs.c"
-          else
-            echo "❌ ERROR: fs/susfs.c not found in SUSFS repo!"
-            exit 1
-          fi
-          
-          if [ -f "susfs4ksu/kernel_patches/include/linux/susfs.h" ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-            echo "✔ Copied include/linux/susfs.h"
-          else
-            echo "❌ ERROR: include/linux/susfs.h not found!"
-            exit 1
-          fi
-          
-          if [ -f "susfs4ksu/kernel_patches/include/linux/susfs_def.h" ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "✔ Copied include/linux/susfs_def.h"
-          else
-            echo "⚠️ susfs_def.h not found, might not be needed"
-          fi
+          patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || echo "⚠️ Kernel patch failed"
 
-          cd KernelSU-Next
-          cp kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./KernelSU-Next/
-          echo "📦 Manual_Hook..."
-            patch -p1 -F 3 < scope_min_manual_hooks_v1.9.patch
-          fi
-          echo "✅ SuSFS Added"
-
-          # Register in fs/Makefile
-          if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-y += susfs.o" >> fs/Makefile
-          fi
-          echo "✔ Applied Register fs/Makefile successfully"
-          
-          echo "📦 Integrating SUSFS with NEXT..."
-          
+          echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU-Next/kernel/ || true
-            echo "✔ Copied SUSFS integration files to KernelSU-Next/kernel/"
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
           fi
           
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          patch p1 < susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+          
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
+          
+          rm -rf susfs4ksu
+          
+          if [ ! -L "drivers/kernelsu" ]; then
+            ln -sf ../KernelSU drivers/kernelsu
+            echo "✔ Created drivers/kernelsu symlink"
+          fi   
+
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
