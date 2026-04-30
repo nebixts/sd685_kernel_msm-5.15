@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-C-28042026"
+        default: "-NeFaRiaN-3.5-C-30042026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -52,6 +52,7 @@ on:
           - "WKSU"
           - "NEXT"
           - "KOWSU"
+          - "KSUN"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -902,6 +903,53 @@ jobs:
           echo "✔ KOWSU configs with SUSFS added"
           
           echo "✅ Installed KOWSU with SUSFS Successfully"
+          
+      - name: "🔧 Setup KernelSU Next"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUN'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -e
+          rm -rf ./KernelSU ./drivers/kernelsu
+          
+          # Install KernelSU Next with SUSFS
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
+          
+          # Apply SUSFS patch
+          PATCH_URL="https://api.github.com/repos/nebixts/kernel_patches/releases/latest"
+          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
+          
+          if [ -n "$SUSFS_PATCH" ]; then
+            curl -L -o susfs.patch "$SUSFS_PATCH"
+            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
+          fi
+          
+          # Apply syscall hooks
+          curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
+          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
+          
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+          
+          echo "✔ KSUN configs with SUSFS added"
           
       - name: "👍 Make defconfig"
         run: |
