@@ -913,6 +913,7 @@ jobs:
           
           # Install KernelSU Next with SUSFS
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
+          echo "✔ KSUN installed successfully"
           
           # Apply SUSFS patch
           PATCH_URL="https://api.github.com/repos/nebixts/kernel_patches/releases/latest"
@@ -925,7 +926,8 @@ jobs:
           
           # Apply syscall hooks
           curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
-          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
+          patch -p1 F 3 < hooks.patch || echo "Warning: Syscall hooks failed"
+          echo "✔ Applied syscall hooks successfully"
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
