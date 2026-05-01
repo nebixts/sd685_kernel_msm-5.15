@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-C-30042026"
+        default: "-NeFaRiaN-3.5-C-01052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -92,6 +92,22 @@ on:
         default: "8"
       lz4kd:
         description: "enable or disable zram lz4kd compression"
+        required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+      lrng_enable:
+        description: 'Enable LRNG v59 (better entropy for crypto/gaming)'
+        required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+      adios_enable:
+        description: 'Enable ADIOS IO Scheduler (Improves IO read/write performance)'
         required: false
         type: choice
         default: "off"
@@ -519,6 +535,35 @@ jobs:
           echo "✅ Applied Enabling F2FS optimizations..."
           echo "✅ Applied Enabling full Netfilter support..."
 
+      - name: "🔧 Enable LRNG v59"
+        if: matrix.variant == 'ksu' && github.event.inputs.lnrg_enable == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Enabling LRNG (Linux Random Number Generator) v59..."
+          # LRNG patch from Epicmann24/SukiSU
+          git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
+          cp -r /tmp/lrng_src/drivers/char/lrng/* drivers/char/lrng/
+          cat >> arch/arm64/configs/gki_defconfig << 'EOF'
+          CONFIG_LRNG=y
+          CONFIG_LRNG_SHA256=y
+          CONFIG_LRNG_COLLECTION_SIZE=1024
+          CONFIG_LRNG_HEALTH_TESTS=y
+          CONFIG_LRNG_RCT_CUTOFF=31
+          CONFIG_LRNG_APT_CUTOFF=325
+          CONFIG_LRNG_IRQ=y
+          CONFIG_LRNG_CONTINUOUS_COMPRESSION_ENABLED=y
+          EOF
+
+      - name: "🔧 Configure ADIOS IO"
+        if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Enabling ADIOS IO Scheduler..."
+          # cd kernel_workspace
+          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          
+          
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
