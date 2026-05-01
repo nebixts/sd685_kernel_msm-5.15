@@ -536,7 +536,7 @@ jobs:
           echo "✅ Applied Enabling full Netfilter support..."
 
       - name: "🔧 Enable LRNG v59"
-        if: matrix.variant == 'ksu' && github.event.inputs.lnrg_enable == 'on'
+        if: matrix.variant == 'ksu' && github.event.inputs.lrng_enable == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo "Enabling LRNG (Linux Random Number Generator) v59..."
@@ -560,9 +560,9 @@ jobs:
         run: |
           echo "Enabling ADIOS IO Scheduler..."
           # cd kernel_workspace
-          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./common/arch/arm64/configs/gki_defconfig
-          
+          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "✔ Applied ADIOS IO successfully"
           
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
