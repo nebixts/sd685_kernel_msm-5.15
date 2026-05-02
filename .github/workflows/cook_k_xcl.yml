@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-C-01052026"
+        default: "-NeFaRiaN-3.5-C-03052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -703,7 +703,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Installing WildKSU
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s 2190b4a9e1203d282b87092c3452361dc7b1d2e4
       
           echo "✔ Wild KSU installed successfully"
           
