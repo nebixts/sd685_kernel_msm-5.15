@@ -542,7 +542,7 @@ jobs:
           echo "Enabling LRNG (Linux Random Number Generator) v59..."
           # LRNG patch from Epicmann24/SukiSU
           git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
-          cp -r /tmp/lrng_src/drivers/char/lrng/* drivers/char/lrng/
+          cp -f /tmp/lrng_src/drivers/char/lrng/* drivers/char/lrng/
           cat >> arch/arm64/configs/gki_defconfig << 'EOF'
           CONFIG_LRNG=y
           CONFIG_LRNG_SHA256=y
@@ -553,6 +553,7 @@ jobs:
           CONFIG_LRNG_IRQ=y
           CONFIG_LRNG_CONTINUOUS_COMPRESSION_ENABLED=y
           EOF
+          echo "✔ Applied LRNG v59 successfully"
 
       - name: "🔧 Configure ADIOS IO"
         if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
@@ -591,7 +592,7 @@ jobs:
           echo "🔧 Applying patched..."
          
           echo "🚀 apply lz4kd 5.15 patch..."
-          cd ./common
+          # cd ./common
             cp ../../SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
             patch -p1 -F 3 < lz4kd.patch || true
           echo "✔ Applied lz4kd patch successfully"
@@ -703,7 +704,8 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Installing WildKSU
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s 2190b4a9e1203d282b87092c3452361dc7b1d2e4
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          # 2190b4a9e1203d282b87092c3452361dc7b1d2e4
       
           echo "✔ Wild KSU installed successfully"
           
@@ -790,8 +792,8 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
+          rm -rf ./KernelSU-Next/kernel ./drivers/kernelsu
           
-          rm -rf ./KernelSU ./drivers/kernelsu
           echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           
@@ -837,7 +839,7 @@ jobs:
           rm -rf susfs4ksu
           
           if [ ! -L "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
+            ln -sf ../KernelSU-Next/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
@@ -971,7 +973,7 @@ jobs:
           
           # Apply syscall hooks
           curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
-          patch -p1 F 3 < hooks.patch || echo "Warning: Syscall hooks failed"
+          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
           echo "✔ Applied syscall hooks successfully"
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
