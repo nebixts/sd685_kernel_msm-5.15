@@ -542,6 +542,7 @@ jobs:
           echo "Enabling LRNG (Linux Random Number Generator) v59..."
           # LRNG patch from Epicmann24/SukiSU
           git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
+          mkdir -p ./drivers/char/lrng
           cp -f /tmp/lrng_src/drivers/char/lrng/* drivers/char/lrng/
           cat >> arch/arm64/configs/gki_defconfig << 'EOF'
           CONFIG_LRNG=y
