@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-C-03052026"
+        default: "-NeFaRiaN-3.5-C-06052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "WKSU"
+        default: "NEXT"
         options:
           - "KERNELSU"
           - "WKSU"
@@ -837,13 +837,16 @@ jobs:
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
           
-          rm -rf susfs4ksu
-          
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU-Next/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
+          echo "⚠️ FORCING CONFIGURATIONS..."
+          sed -i '/CONFIG_KSU/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          sed -i '/CONFIG_KPROBES/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          sed -i '/CONFIG_KALLSYMS/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
