@@ -797,8 +797,6 @@ jobs:
           
           echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
-
-          cd KernelSU
           
           KBUILD_FILE="kernel/Makefile"
           if [ -f "kernel/Kbuild" ]; then
@@ -844,9 +842,7 @@ jobs:
 
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          mkdir -p KernelSU
-          if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU
+          
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
@@ -856,16 +852,17 @@ jobs:
               sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
               sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
             fi
-          else
-            echo "⚠️ KSU patch missing — manually injecting changes"
-            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
-          fi
-          
+            
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
+
+          # Register in fs/Makefile
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-y += susfs.o" >> fs/Makefile
+          fi
+          echo "✔ Applied Register fs/Makefile successfully"
           
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
