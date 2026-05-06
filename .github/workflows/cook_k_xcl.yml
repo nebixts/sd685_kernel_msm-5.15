@@ -846,13 +846,13 @@ jobs:
             else
               echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
               cd ..
-              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+              sed -i '/#include /a #include ' KernelSU-Next/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU-Next/kernel/ksu.c
             fi
           else
             echo "⚠️ KSU patch missing — manually injecting changes"
-            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+            sed -i '/#include /a #include ' KernelSU-Next/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU-Next/kernel/ksu.c
           fi
           
           echo "🔍 Verifying SUSFS files..."
