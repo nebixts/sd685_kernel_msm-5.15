@@ -17,7 +17,7 @@ on:
         description: "Kernel branch"
         required: false
         type: choice
-        default: "codelinaro"
+        default: "google"
         options:
           - "google"
           - "zepharo"
@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-C-06052026"
+        default: "-NeFaRiaN-3.5-G-07052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -812,11 +812,8 @@ jobs:
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
-          echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          
           echo "📄 Forcing SUSFS source injection..."
-          
+
           mkdir -p fs
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
           echo "✔ Copied fs/susfs.c"
@@ -830,6 +827,32 @@ jobs:
             echo "✔ Copied include/linux/susfs_def.h"
           else
             echo "⚠️ susfs_def.h not found in repo"
+          fi
+
+          echo "📦 Injecting SUSFS -> KernelSU integration files"
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU-Next/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
+          fi
+
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+
+          if [ -f "$KSU_PATCH" ]; then
+            cd KernelSU-Next
+            if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
+              patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
+              cd ..
+            else
+              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
+              cd ..
+              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+            fi
+          else
+            echo "⚠️ KSU patch missing — manually injecting changes"
+            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
           fi
           
           echo "🔍 Verifying SUSFS files..."
