@@ -839,20 +839,20 @@ jobs:
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
 
           if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU-Next
+            cd KernelSU-Next/kernel
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
             else
               echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
               cd ..
-              sed -i '/#include /a #include ' KernelSU-Next/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU-Next/kernel/ksu.c
+              sed -i '/#include /a #include ' KernelSU-Next/kernel/core/ksu.c
+              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU-Next/kernel/core/ksu.c
             fi
           else
             echo "⚠️ KSU patch missing — manually injecting changes"
-            sed -i '/#include /a #include ' KernelSU-Next/kernel/ksu.c
-            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU-Next/kernel/ksu.c
+            sed -i '/#include /a #include ' KernelSU-Next/kernel/core/ksu.c
+            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU-Next/kernel/core/ksu.c
           fi
           
           echo "🔍 Verifying SUSFS files..."
