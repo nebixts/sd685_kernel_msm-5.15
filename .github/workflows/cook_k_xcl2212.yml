@@ -1145,6 +1145,7 @@ jobs:
               sed -i '/CONFIG_KPROBES/d' "$CONF"
               sed -i '/CONFIG_KALLSYMS/d' "$CONF"
           fi
+          done
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
@@ -1167,6 +1168,7 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
+          
           echo "✔ KSUB configs with SUSFS added"
           
           rm -rf susfs4ksu
