@@ -846,28 +846,52 @@ jobs:
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
 
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+      
           if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU/kernel
+            cd KernelSU
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
-           else
-              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
+            else
+              echo "⚠️ KSU SUSFS patch failed — applying manual fallback with precise sed syntax"
               cd ..
-              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
-             fi
-           fi
+              # FIX: Injects valid header inclusion and prevents compilation failure
+              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+              echo "✔ Manually hooked susfs_init() inside ksu.c"
+            fi
+          else
+            echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise sed syntax"
+            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+            echo "✔ Manually hooked susfs_init() inside ksu.c"
+          fi
+          echo "✔ Applied SUSFS -> KernelSU patch successfully"
+            
+          # FIX: Force EXPORT_SYMBOL to make the function globally visible to the linker under LTO optimization
+          if [ -f "fs/susfs.c" ]; then
+            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
+              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
+              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
+            fi
+          fi
             
           echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h KernelSU/kernel/ksu.c; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
 
-          if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-y += susfs.o" >> fs/Makefile
-          fi
-          echo "✔ Applied Register fs/Makefile successfully"
+          # FIX: Dynamically handles layout changes by finding and updating all sub-workspace fs/Makefiles
+          echo "🔍 Registering SUSFS across all sub-workspace Makefiles..."
+          MAKEFILES=$(find . -name "Makefile" | grep "fs/Makefile")
+          for mfile in $MAKEFILES; do
+            if ! grep -q "susfs.o" "$mfile"; then
+              echo "obj-y += susfs.o" >> "$mfile"
+              echo "✔ Registered susfs.o in $mfile"
+            fi
+          done
           
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
@@ -875,9 +899,15 @@ jobs:
           fi
 
           echo "⚠️ FORCING CONFIGURATIONS..."
-          sed -i '/CONFIG_KSU/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i '/CONFIG_KPROBES/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i '/CONFIG_KALLSYMS/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
+          for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
+          if [ -f "$CONF" ]; then
+              echo "📝 Configuring $CONF"
+              sed -i '/CONFIG_KSU/d' "$CONF"
+              sed -i '/CONFIG_KPROBES/d' "$CONF"
+              sed -i '/CONFIG_KALLSYMS/d' "$CONF"
+          fi
+          done
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
