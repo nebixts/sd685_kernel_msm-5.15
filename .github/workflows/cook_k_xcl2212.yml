@@ -1144,29 +1144,30 @@ jobs:
               sed -i '/CONFIG_KSU/d' "$CONF"
               sed -i '/CONFIG_KPROBES/d' "$CONF"
               sed -i '/CONFIG_KALLSYMS/d' "$CONF"
-          
-              cat >> "$CONFIG_FILE" << 'EOF'
-              CONFIG_KSU=y
-              CONFIG_KSU_SUSFS=y
-              CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-              CONFIG_KSU_SUSFS_SUS_PATH=y
-              CONFIG_KSU_SUSFS_SUS_MOUNT=y
-              CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-              CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-              CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-              CONFIG_KSU_SUSFS_SUS_KSTAT=y
-              CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-              CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-              CONFIG_KSU_SUSFS_ENABLE_LOG=y
-              CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-              CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-              CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-              CONFIG_KSU_SUSFS_SUS_MAP=y
-              CONFIG_KSU_SUSFS_SUS_SU=y
-              EOF
-              echo "✔ KSUB configs with SUSFS added"
           fi
-          done
+
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+          echo "✔ KSUB configs with SUSFS added"
           
           rm -rf susfs4ksu
 
