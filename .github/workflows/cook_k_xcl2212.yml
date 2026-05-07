@@ -1097,18 +1097,28 @@ jobs:
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
 
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           if [ -f "$KSU_PATCH" ]; then
             cd KernelSU/kernel
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
-           else
-              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
+            else
+              echo "⚠️ KSU SUSFS patch failed — applying manual fallback with precise sed syntax"
               cd ..
-              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
-             fi
-           fi
+              # FIX: Injects valid header inclusion and prevents compilation failure
+              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+              echo "✔ Manually hooked susfs_init() inside ksu.c"
+            fi
+          else
+            echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise sed syntax"
+            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+            echo "✔ Manually hooked susfs_init() inside ksu.c"
+          fi
+          echo "✔ Applied SUSFS -> KernelSU patch successfully"
             
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
@@ -1126,34 +1136,37 @@ jobs:
           fi
 
           echo "⚠️ FORCING CONFIGURATIONS..."
-          sed -i '/CONFIG_KSU/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i '/CONFIG_KPROBES/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i '/CONFIG_KALLSYMS/d' arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          # FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
+          for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
+          if [ -f "$CONF" ]; then
+              echo "📝 Configuring $CONF"
+              sed -i '/CONFIG_KSU/d' "$CONF"
+              sed -i '/CONFIG_KPROBES/d' "$CONF"
+              sed -i '/CONFIG_KALLSYMS/d' "$CONF"
           
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          echo "📝 Configuring $CONFIG_FILE"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          EOF
+              cat >> "$CONFIG_FILE" << 'EOF'
+              CONFIG_KSU=y
+              CONFIG_KSU_SUSFS=y
+              CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+              CONFIG_KSU_SUSFS_SUS_PATH=y
+              CONFIG_KSU_SUSFS_SUS_MOUNT=y
+              CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+              CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+              CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+              CONFIG_KSU_SUSFS_SUS_KSTAT=y
+              CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+              CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+              CONFIG_KSU_SUSFS_ENABLE_LOG=y
+              CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+              CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+              CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+              CONFIG_KSU_SUSFS_SUS_MAP=y
+              CONFIG_KSU_SUSFS_SUS_SU=y
+              EOF
+              echo "✔ KSUB configs with SUSFS added"
+          fi
+          done
           
-          echo "✔ KSUB configs with SUSFS added"
-
           rm -rf susfs4ksu
 
           echo "🎉 KSUB with SUSFS Integration complete!"
