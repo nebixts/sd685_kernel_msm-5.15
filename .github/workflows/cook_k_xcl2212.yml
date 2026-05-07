@@ -1121,31 +1121,44 @@ jobs:
           fi
           echo "✔ Applied SUSFS -> KernelSU patch successfully"
             
+          # FIX: Force EXPORT_SYMBOL to make the function globally visible to the linker under LTO optimization
+          if [ -f "fs/susfs.c" ]; then
+            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
+              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
+              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
+            fi
+          fi
+            
           echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h KernelSU/kernel/ksu.c; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
 
-          if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-y += susfs.o" >> fs/Makefile
-          fi
-          echo "✔ Applied Register fs/Makefile successfully"
+          # FIX: Dynamically handles layout changes by finding and updating all sub-workspace fs/Makefiles
+          echo "🔍 Registering SUSFS across all sub-workspace Makefiles..."
+          MAKEFILES=$(find . -name "Makefile" | grep "fs/Makefile")
+          for mfile in $MAKEFILES; do
+            if ! grep -q "susfs.o" "$mfile"; then
+              echo "obj-y += susfs.o" >> "$mfile"
+              echo "✔ Registered susfs.o in $mfile"
+            fi
+          done
           
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
-          #echo "⚠️ FORCING CONFIGURATIONS..."
-          # FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
-          #for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
-          #if [ -f "$CONF" ]; then
-              #echo "📝 Configuring $CONF"
-              #sed -i '/CONFIG_KSU/d' "$CONF"
-              #sed -i '/CONFIG_KPROBES/d' "$CONF"
-              #sed -i '/CONFIG_KALLSYMS/d' "$CONF"
-          #fi
-          #done
+          echo "⚠️ FORCING CONFIGURATIONS..."
+          FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
+          for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
+          if [ -f "$CONF" ]; then
+              echo "📝 Configuring $CONF"
+              sed -i '/CONFIG_KSU/d' "$CONF"
+              sed -i '/CONFIG_KPROBES/d' "$CONF"
+              sed -i '/CONFIG_KALLSYMS/d' "$CONF"
+          fi
+          done
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
