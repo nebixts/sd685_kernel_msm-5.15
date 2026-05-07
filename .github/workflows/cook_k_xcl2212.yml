@@ -1048,7 +1048,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu
           
           echo "📦 Installing KSUB..."
-          curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/main/kernel/setup.sh" | bash -s master
+          curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s master
           
           KBUILD_FILE="kernel/Makefile"
           if [ -f "kernel/Kbuild" ]; then
