@@ -799,10 +799,10 @@ jobs:
           echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           
-          KBUILD_FILE="kernel/Makefile"
-          if [ -f "kernel/Kbuild" ]; then
-            KBUILD_FILE="kernel/Kbuild"
-          fi
+          #KBUILD_FILE="kernel/Makefile"
+          #if [ -f "kernel/Kbuild" ]; then
+          #  KBUILD_FILE="kernel/Kbuild"
+          #fi
           
           echo "✔ NEXT installed successfully"
           
@@ -1080,10 +1080,10 @@ jobs:
           echo "📦 Installing KSUB..."
           curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s master
           
-          KBUILD_FILE="kernel/Makefile"
-          if [ -f "kernel/Kbuild" ]; then
-            KBUILD_FILE="kernel/Kbuild"
-          fi
+          #KBUILD_FILE="kernel/Makefile"
+          #if [ -f "kernel/Kbuild" ]; then
+          #  KBUILD_FILE="kernel/Kbuild"
+          #fi
           
           echo "✔ KSUB installed successfully"
           
