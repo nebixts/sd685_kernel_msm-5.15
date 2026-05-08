@@ -850,7 +850,7 @@ jobs:
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
       
           if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU
+            cd KernelSU/kernel
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
@@ -899,7 +899,7 @@ jobs:
           fi
 
           echo "⚠️ FORCING CONFIGURATIONS..."
-          FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
+          # FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
           for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
           if [ -f "$CONF" ]; then
               echo "📝 Configuring $CONF"
@@ -1180,7 +1180,7 @@ jobs:
           fi
 
           echo "⚠️ FORCING CONFIGURATIONS..."
-          FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
+          # FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
           for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
           if [ -f "$CONF" ]; then
               echo "📝 Configuring $CONF"
