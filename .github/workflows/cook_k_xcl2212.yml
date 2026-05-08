@@ -832,24 +832,42 @@ jobs:
             echo "✔ Copied include/linux/susfs_def.h"
           fi
 
-          # 1. Precise Dynamic Location of KernelSU-Next Root Core
-          echo "🔍 Locating KernelSU-Next core directory..."
+          # 1. Aggressive Dynamic Location & Auto-Clone Fallback
+          echo "🔍 Locating KernelSU-Next source core..."
           KSU_CORE_FILE=$(find . -name "ksu.c" | head -n 1)
 
           if [ -n "$KSU_CORE_FILE" ]; then
             KSU_NEXT_DIR=$(dirname "$(realpath "$KSU_CORE_FILE")")
             echo "📂 KernelSU-Next core path localized at: $KSU_NEXT_DIR"
           else
-            echo "❌ ERROR: Could not locate ksu.c anywhere in the workspace tree!"
-            exit 1
+            echo "⚠️ KernelSU-Next source missing from workspace! Pulling repository..."
+            # Adjust path to fit your GKI setup structure seamlessly
+            TARGET_CLONE_DIR="common_gki/common/KernelSU-Next"
+            mkdir -p "$TARGET_CLONE_DIR"
+            
+            # Clone official source (use branch next-susfs or main depending on your patch matching)
+            git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next "$TARGET_CLONE_DIR"
+            
+            KSU_CORE_FILE=$(find . -name "ksu.c" | head -n 1)
+            if [ -n "$KSU_CORE_FILE" ]; then
+              KSU_NEXT_DIR=$(dirname "$(realpath "$KSU_CORE_FILE")")
+              echo "✅ KernelSU-Next successfully deployed at: $KSU_NEXT_DIR"
+            else
+              echo "❌ ERROR: Failed to provision KernelSU-Next components!"
+              exit 1
+            fi
           fi
 
+          # 2. Injecting SUSFS -> KernelSU integration files
           echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_NEXT_DIR/"
             echo "✔ Copied SUSFS KernelSU integration files"
+          else
+            echo "ℹ Source integration patches directory missing, continuing to raw codebase modifications"
           fi
 
+          # 3. Applying SUSFS -> KernelSU patch
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="$ROOT_DIR/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
     
@@ -859,29 +877,19 @@ jobs:
               patch -p1 < "$KSU_PATCH" && echo "✔ Applied KSU SUSFS patch"
             else
               echo "⚠️ KSU SUSFS patch failed — applying manual structural fallback"
-              # Double-check that ksu.c exists locally before targeting
-              if [ -f "ksu.c" ]; then
-                sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' ksu.c
-                sed -i '/ksu_core_init()/a \\tsusfs_init();' ksu.c
-                echo "✔ Manually hooked susfs_init() inside ksu.c"
-              else
-                echo "❌ ERROR: ksu.c not found inside $KSU_NEXT_DIR even after localization!"
-                exit 1
-              fi
+              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' ksu.c
+              sed -i '/ksu_core_init()/a \\tsusfs_init();' ksu.c
+              echo "✔ Manually hooked susfs_init() inside ksu.c"
             fi
             cd "$ROOT_DIR"
           else
-            echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise absolute pathing"
-            if [ -f "$KSU_NEXT_DIR/ksu.c" ]; then
-              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' "$KSU_NEXT_DIR/ksu.c"
-              sed -i '/ksu_core_init()/a \\tsusfs_init();' "$KSU_NEXT_DIR/ksu.c"
-              echo "✔ Manually hooked susfs_init() inside $KSU_NEXT_DIR/ksu.c"
-            else
-              echo "❌ ERROR: Absolute fallback target $KSU_NEXT_DIR/ksu.c does not exist!"
-              exit 1
-            fi
+            echo "⚠️ KSU_PATCH file not found — applying manual structural fallback directly"
+            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' "$KSU_NEXT_DIR/ksu.c"
+            sed -i '/ksu_core_init()/a \\tsusfs_init();' "$KSU_NEXT_DIR/ksu.c"
+            echo "✔ Manually hooked susfs_init() inside $KSU_NEXT_DIR/ksu.c"
           fi
 
+          # 4. Global Sanity Diagnostics & Verification Map
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h "$KSU_NEXT_DIR/ksu.c"; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
@@ -1338,6 +1346,6 @@ jobs:
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: NeFaRiaN-XCL22
-          path: ${{ env.ZIP_FILENAME }}
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_PATH }}
           retention-days: 7
