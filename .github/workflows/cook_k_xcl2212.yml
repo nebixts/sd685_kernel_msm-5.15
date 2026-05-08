@@ -832,18 +832,17 @@ jobs:
             echo "✔ Copied include/linux/susfs_def.h"
           fi
 
-          # Find where KernelSU-Next source was actually installed
-          if [ -d "KernelSU-Next/kernel" ]; then
-            KSU_NEXT_DIR="$ROOT_DIR/KernelSU-Next/kernel"
-            elif [ -d "drivers/kernelsu" ]; then
-            KSU_NEXT_DIR="$ROOT_DIR/drivers/kernelsu"
-            elif [ -d "KernelSU-Next" ]; then
-            KSU_NEXT_DIR="$ROOT_DIR/KernelSU-Next"
-            else
-            echo "❌ ERROR: Could not locate KernelSU-Next directory tree!"
+          # 1. Precise Dynamic Location of KernelSU-Next Root Core
+          echo "🔍 Locating KernelSU-Next core directory..."
+          KSU_CORE_FILE=$(find . -name "ksu.c" | head -n 1)
+
+          if [ -n "$KSU_CORE_FILE" ]; then
+            KSU_NEXT_DIR=$(dirname "$(realpath "$KSU_CORE_FILE")")
+            echo "📂 KernelSU-Next core path localized at: $KSU_NEXT_DIR"
+          else
+            echo "❌ ERROR: Could not locate ksu.c anywhere in the workspace tree!"
             exit 1
           fi
-          echo "📂 KernelSU-Next path localized at: $KSU_NEXT_DIR"
 
           echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
@@ -860,30 +859,41 @@ jobs:
               patch -p1 < "$KSU_PATCH" && echo "✔ Applied KSU SUSFS patch"
             else
               echo "⚠️ KSU SUSFS patch failed — applying manual structural fallback"
-              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' ksu.c
-              sed -i '/ksu_core_init()/a \\tsusfs_init();' ksu.c
-              echo "✔ Manually hooked susfs_init() inside ksu.c"
+              # Double-check that ksu.c exists locally before targeting
+              if [ -f "ksu.c" ]; then
+                sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' ksu.c
+                sed -i '/ksu_core_init()/a \\tsusfs_init();' ksu.c
+                echo "✔ Manually hooked susfs_init() inside ksu.c"
+              else
+                echo "❌ ERROR: ksu.c not found inside $KSU_NEXT_DIR even after localization!"
+                exit 1
+              fi
             fi
             cd "$ROOT_DIR"
           else
-            echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise sed syntax"
-            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' "$KSU_NEXT_DIR/ksu.c"
-            sed -i '/ksu_core_init()/a \\tsusfs_init();' "$KSU_NEXT_DIR/ksu.c"
-            echo "✔ Manually hooked susfs_init() inside ksu.c"
+            echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise absolute pathing"
+            if [ -f "$KSU_NEXT_DIR/ksu.c" ]; then
+              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' "$KSU_NEXT_DIR/ksu.c"
+              sed -i '/ksu_core_init()/a \\tsusfs_init();' "$KSU_NEXT_DIR/ksu.c"
+              echo "✔ Manually hooked susfs_init() inside $KSU_NEXT_DIR/ksu.c"
+            else
+              echo "❌ ERROR: Absolute fallback target $KSU_NEXT_DIR/ksu.c does not exist!"
+              exit 1
+            fi
           fi
 
           echo "🔍 Verifying SUSFS files..."
           for f in fs/susfs.c include/linux/susfs.h "$KSU_NEXT_DIR/ksu.c"; do
-          if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
 
           echo "🔍 Verifying and Registering SUSFS in Makefiles..."
           MAKEFILES=$(find . -name "Makefile" | grep "fs/Makefile")
           for mfile in $MAKEFILES; do
-          if ! grep -q "susfs.o" "$mfile"; then
-            echo "obj-y += susfs.o" >> "$mfile"
-            echo "✔ Registered susfs.o in $mfile"
-          fi
+            if ! grep -q "susfs.o" "$mfile"; then
+              echo "obj-y += susfs.o" >> "$mfile"
+              echo "✔ Registered susfs.o in $mfile"
+            fi
           done
 
           if [ -f "fs/susfs.c" ]; then
@@ -894,6 +904,7 @@ jobs:
           fi
         
           if [ ! -d "drivers/kernelsu" ] && [ ! -L "drivers/kernelsu" ]; then
+            mkdir -p drivers
             ln -sf "$KSU_NEXT_DIR" drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink replacement"
           fi
