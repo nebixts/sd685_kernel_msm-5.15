@@ -794,7 +794,7 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          rm -rf ./KernelSU ./drivers/kernelsu
+          rm -rf ./KernelSU-Next ./drivers/kernelsu
           
           echo "📦 Installing NEXT..."
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
@@ -842,7 +842,7 @@ jobs:
 
           echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU-Next/kernel/
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
 
@@ -850,7 +850,7 @@ jobs:
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
       
           if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU/kernel
+            cd KernelSU-Next
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
@@ -858,33 +858,20 @@ jobs:
               echo "⚠️ KSU SUSFS patch failed — applying manual fallback with precise sed syntax"
               cd ..
               # FIX: Injects valid header inclusion and prevents compilation failure
-              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU-Next/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU-Next/kernel/ksu.c
               echo "✔ Manually hooked susfs_init() inside ksu.c"
             fi
           else
             echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise sed syntax"
-            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
-            sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU-Next/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU-Next/kernel/ksu.c
             echo "✔ Manually hooked susfs_init() inside ksu.c"
           fi
           echo "✔ Applied SUSFS -> KernelSU patch successfully"
-            
-          # FIX: Force EXPORT_SYMBOL to make the function globally visible to the linker under LTO optimization
-          if [ -f "fs/susfs.c" ]; then
-            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
-              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
-              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
-            fi
-          fi
-            
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h KernelSU/kernel/ksu.c; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
 
-          # FIX: Dynamically handles layout changes by finding and updating all sub-workspace fs/Makefiles
-          echo "🔍 Registering SUSFS across all sub-workspace Makefiles..."
+          echo "🔍 Verifying and Registering SUSFS in Makefiles..."
+          # Fix: Forces the obj-y registration into every potential fs/Makefile in your workspace
           MAKEFILES=$(find . -name "Makefile" | grep "fs/Makefile")
           for mfile in $MAKEFILES; do
             if ! grep -q "susfs.o" "$mfile"; then
@@ -892,9 +879,17 @@ jobs:
               echo "✔ Registered susfs.o in $mfile"
             fi
           done
+
+          # Fix: Ensure the functions are declared globally exported if LTO is active
+          if [ -f "fs/susfs.c" ]; then
+            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
+              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
+              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
+            fi
+          fi
           
           if [ ! -L "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU/kernel drivers/kernelsu
+            ln -sf ../KernelSU-Next/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
@@ -1150,22 +1145,9 @@ jobs:
             echo "✔ Manually hooked susfs_init() inside ksu.c"
           fi
           echo "✔ Applied SUSFS -> KernelSU patch successfully"
-            
-          # FIX: Force EXPORT_SYMBOL to make the function globally visible to the linker under LTO optimization
-          if [ -f "fs/susfs.c" ]; then
-            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
-              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
-              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
-            fi
-          fi
-            
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h KernelSU/kernel/ksu.c; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
 
-          # FIX: Dynamically handles layout changes by finding and updating all sub-workspace fs/Makefiles
-          echo "🔍 Registering SUSFS across all sub-workspace Makefiles..."
+          echo "🔍 Verifying and Registering SUSFS in Makefiles..."
+          # Fix: Forces the obj-y registration into every potential fs/Makefile in your workspace
           MAKEFILES=$(find . -name "Makefile" | grep "fs/Makefile")
           for mfile in $MAKEFILES; do
             if ! grep -q "susfs.o" "$mfile"; then
@@ -1173,6 +1155,14 @@ jobs:
               echo "✔ Registered susfs.o in $mfile"
             fi
           done
+
+          # Fix: Ensure the functions are declared globally exported if LTO is active
+          if [ -f "fs/susfs.c" ]; then
+            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
+              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
+              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
+            fi
+          fi
           
           if [ ! -L "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
