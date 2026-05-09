@@ -1028,7 +1028,7 @@ jobs:
 
           echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU-Next/kernel/
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
 
@@ -1045,7 +1045,7 @@ jobs:
           KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
 
           cd KernelSU-Next
-          if patch -p1 -f < "$KSU_PATCH"; then
+          if patch -p1 < "$KSU_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
             echo "⚠️ KSU patch failed — copying files manually"
