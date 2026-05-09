@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-09052026"
+        default: "-NeFaRiaN-3.5-G-10052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -1025,11 +1025,6 @@ jobs:
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
           echo "✔ Applied Manual file copy successfully"
-          
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
 
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
           
@@ -1040,10 +1035,24 @@ jobs:
             echo "⚠️ SUSFS patch failed — copying files manually"
           fi
 
-          echo "🔧 Applying Syscall hooks -> KernelSU patch..."
-          curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
-          patch -p1 -f < hooks.patch || echo "Warning: Syscall hooks failed"
-          echo "✔ Applied syscall hooks successfully"
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+          
+          if patch -p1 -f < "$KSU_PATCH"; then
+            echo "✅ KSU patch successfully applied"
+          else
+            echo "⚠️ KSU patch failed — copying files manually"
+          fi
+          
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
+
+          #echo "🔧 Applying Syscall hooks -> KernelSU patch..."
+          #curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
+          #patch -p1 -f < hooks.patch || echo "Warning: Syscall hooks failed"
+          #echo "✔ Applied syscall hooks successfully"
           
           if [ ! -d "drivers/kernelsu" ]; then
             ln -sf ../KernelSU-Next drivers/kernelsu
@@ -1338,6 +1347,6 @@ jobs:
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: NeFaRiaN-XCL2212
-          path: ${{ env.ZIP_PATH }}
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_FILENAME }}
           retention-days: 7
