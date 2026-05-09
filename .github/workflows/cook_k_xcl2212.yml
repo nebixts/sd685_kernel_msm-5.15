@@ -1007,64 +1007,66 @@ jobs:
           
           echo "✅ Installed KOWSU with SUSFS Successfully"
           
+      
       - name: "🔧 Setup KernelSU Next"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUN'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
+          # Clean up existing KSU if present
           rm -rf ./KernelSU ./drivers/kernelsu
-          
+        
+          # Install KSUN
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           echo "✔ KSUN installed successfully"
-          
+        
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-          
-          # Manual file copy (Required for some SUSFS versions)
+        
+          echo "📂 Copying SUSFS source files..."
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
-          [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
-          echo "✔ Applied Manual file copy successfully"
-
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/ || true
+        
           echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
 
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
-
           echo "🔧 Applying SUSFS kernel patch..."
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+          if patch -p1 --forward < "$SUSFS_KERNEL_PATCH"; then
             echo "✅ SUSFS patch successfully applied"
           else
-            echo "⚠️ SUSFS patch failed — copying files manually"
+            echo "⚠️ SUSFS patch failed or already applied"
           fi
 
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-
-          cd KernelSU
-          if patch -p1 < "$KSU_PATCH"; then
-            echo "✅ KSU patch successfully applied"
-          else
-            echo "⚠️ KSU patch failed — copying files manually"
-          fi
-          
-          #echo "🔧 Applying Syscall hooks -> KernelSU patch..."
-          #curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
-          #patch -p1 -f < hooks.patch || echo "Warning: Syscall hooks failed"
-          #echo "✔ Applied syscall hooks successfully"
-          
+          KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          # Use subshell ( ) to keep pathing consistent
+          (
+            cd KernelSU
+            if patch -p1 --forward < "$KSU_PATCH"; then
+              echo "✅ KSU patch successfully applied"
+            else
+              echo "⚠️ KSU patch failed"
+            fi
+          )
+        
+          # Check if symlink is needed (Standard KSU uses drivers/kernelsu)
           if [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
+            ln -sf ../KernelSU/kernel drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
+        
+          # Configure Defconfig
+          # Make sure env.DEFCONFIG_NAME is just the filename, not the full path
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
+        
+          # Remove existing KSU configs to prevent duplicates if building dirty
+          sed -i '/CONFIG_KSU/d' "$CONFIG_FILE"
           
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
