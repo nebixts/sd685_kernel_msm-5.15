@@ -1017,7 +1017,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu
         
           # Install KSUN
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next-susfs-a13-5.15-dev/kernel/setup.sh" | bash -s next-susfs-a13-5.15-dev
           echo "✔ KSUN installed successfully"
         
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
@@ -1027,13 +1027,7 @@ jobs:
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
           cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/ || true
-        
-          echo "📦 Injecting SUSFS -> KernelSU integration files"
-          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
-            echo "✔ Copied SUSFS KernelSU integration files"
-          fi
-
+    
           echo "🔧 Applying SUSFS kernel patch..."
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
           if patch -p1 --forward < "$SUSFS_KERNEL_PATCH"; then
@@ -1041,18 +1035,6 @@ jobs:
           else
             echo "⚠️ SUSFS patch failed or already applied"
           fi
-
-          echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          # Use subshell ( ) to keep pathing consistent
-          (
-            mkdir -p KernelSU
-            if patch -p1 --forward < "$KSU_PATCH"; then
-              echo "✅ KSU patch successfully applied"
-            else
-              echo "⚠️ KSU patch failed"
-            fi
-          )
         
           # Check if symlink is needed (Standard KSU uses drivers/kernelsu)
           if [ ! -d "drivers/kernelsu" ]; then
