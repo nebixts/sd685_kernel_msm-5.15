@@ -1012,7 +1012,7 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          rm -rf ./KernelSU-Next ./drivers/kernelsu
+          rm -rf ./KernelSU ./drivers/kernelsu
           
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           echo "✔ KSUN installed successfully"
@@ -1028,9 +1028,14 @@ jobs:
 
           echo "📦 Injecting SUSFS -> KernelSU integration files"
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU-Next/kernel/
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
+
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
+          done
 
           echo "🔧 Applying SUSFS kernel patch..."
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
@@ -1042,27 +1047,22 @@ jobs:
           fi
 
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
+          KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
 
-          cd KernelSU-Next
+          cd KernelSU
           if patch -p1 < "$KSU_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
             echo "⚠️ KSU patch failed — copying files manually"
           fi
           
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
-
           #echo "🔧 Applying Syscall hooks -> KernelSU patch..."
           #curl -L -o hooks.patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch"
           #patch -p1 -f < hooks.patch || echo "Warning: Syscall hooks failed"
           #echo "✔ Applied syscall hooks successfully"
           
           if [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU-Next drivers/kernelsu
+            ln -sf ../KernelSU drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
           
