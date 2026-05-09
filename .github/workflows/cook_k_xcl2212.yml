@@ -1026,9 +1026,15 @@ jobs:
           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
           echo "✔ Applied Manual file copy successfully"
 
+          echo "📦 Injecting SUSFS -> KernelSU integration files"
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
+          fi
+
+          echo "🔧 Applying SUSFS kernel patch..."
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
           
-          echo "🔧 Applying SUSFS kernel patch..."
           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
             echo "✅ SUSFS patch successfully applied"
           else
@@ -1037,7 +1043,8 @@ jobs:
 
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH=susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch || echo "⚠️ KSU patch failed"
-          
+
+          cd KernelSU-Next
           if patch -p1 -f < "$KSU_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
