@@ -1046,7 +1046,7 @@ jobs:
           KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           # Use subshell ( ) to keep pathing consistent
           (
-            cd KernelSU
+            mkdir -p KernelSU
             if patch -p1 --forward < "$KSU_PATCH"; then
               echo "✅ KSU patch successfully applied"
             else
@@ -1068,8 +1068,6 @@ jobs:
           # Remove existing KSU configs to prevent duplicates if building dirty
           sed -i '/CONFIG_KSU/d' "$CONFIG_FILE"
           
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
