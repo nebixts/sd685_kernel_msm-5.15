@@ -597,7 +597,7 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
           
-          echo "✔ KernelSU configs with SUSFS
+          echo "✔ KernelSU configs with SUSFS"
 
           rm -rf susfs4ksu
 
