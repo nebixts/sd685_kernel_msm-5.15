@@ -96,30 +96,6 @@ on:
         options:
           - "thin"
           - "full"
-      lz4kd:
-        description: "enable or disable zram lz4kd compression"
-        required: false
-        type: choice
-        default: "off"
-        options:
-          - "on"
-          - "off"
-      lrng_enable:
-        description: 'Enable LRNG v59 (better entropy for crypto/gaming)'
-        required: false
-        type: choice
-        default: "off"
-        options:
-          - "on"
-          - "off"
-      adios_enable:
-        description: 'Enable ADIOS IO Scheduler (Improves IO read/write performance)'
-        required: false
-        type: choice
-        default: "on"
-        options:
-          - "on"
-          - "off"
 
 jobs:
   Build-Kernel:
@@ -473,106 +449,6 @@ jobs:
           echo "✅ Applied Enabling F2FS optimizations..."
           echo "✅ Applied Enabling full Netfilter support..."
 
-      - name: "🔧 Enable LRNG v59"
-        if: matrix.variant == 'ksu' && github.event.inputs.lrng_enable == 'on'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo "Enabling LRNG (Linux Random Number Generator)..."
-        
-          # 1. Clean up and clone
-          rm -rf /tmp/lrng_src
-          git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
-        
-          # 2. Create target directory and copy source files
-          # The source files are in the root of the repo, not a 'drivers' subfolder
-          mkdir -p drivers/char/lrng
-          cp -f /tmp/lrng_src/*.c drivers/char/lrng/
-          cp -f /tmp/lrng_src/*.h drivers/char/lrng/
-          cp -f /tmp/lrng_src/Kconfig drivers/char/lrng/
-          cp -f /tmp/lrng_src/Makefile drivers/char/lrng/
-
-          # 3. Link LRNG to the drivers/char build system
-          if ! grep -q "lrng" drivers/char/Makefile; then
-            echo "obj-\$(CONFIG_LRNG) += lrng/" >> drivers/char/Makefile
-          fi
-          if ! grep -q "lrng" drivers/char/Kconfig; then
-            sed -i '/endmenu/i source "drivers/char/lrng/Kconfig"' drivers/char/Kconfig
-          fi
-
-          # 4. Inject Defconfig
-          # Note: Removed trailing spaces and fixed potential double-injection
-          sed -i '/CONFIG_LRNG/d' arch/arm64/configs/gki_defconfig
-          cat >> arch/arm64/configs/gki_defconfig << 'EOF'
-          CONFIG_LRNG=y
-          CONFIG_LRNG_SHA256=y
-          CONFIG_LRNG_COLLECTION_SIZE=1024
-          CONFIG_LRNG_HEALTH_TESTS=y
-          CONFIG_LRNG_RCT_CUTOFF=31
-          CONFIG_LRNG_APT_CUTOFF=325
-          CONFIG_LRNG_IRQ=y
-          CONFIG_LRNG_CONTINUOUS_COMPRESSION_ENABLED=y
-          EOF
-          echo "✔ LRNG files copied and linked successfully"
-
-      - name: "🔧 Enable ZRAM with LZ4KD"
-        if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo "🚀 Preparing ZRAM and LZ4KD..."
-        
-          # 1. Clean up and Clone the patch repository
-          rm -rf SukiSU_patch
-          git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git
-          echo "✔ Repository cloned successfully"
-
-          # 2. Copy LZ4KD source files
-          # The paths are relative to the current directory where you cloned the repo
-          echo "📦 Copying LZ4KD source files..."
-          cp -rf SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
-          cp -rf SukiSU_patch/other/zram/lz4k/lib/* ./lib/
-          cp -rf SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
-          echo "✔ Files copied successfully"
-         
-          # 3. Apply the 5.15 kernel patch
-          echo "🔧 Applying lz4kd patch for kernel 5.15..."
-          cp SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
-          if patch -p1 --forward < lz4kd.patch; then
-            echo "✅ LZ4KD patch successfully applied"
-          else
-            echo "⚠️ Patch already applied or failed (skipping)"
-          fi
-
-          # 4. Enable configurations in Defconfig
-          # Using sed to prevent duplicates if the build is re-run
-          CONFIG_FILE="arch/arm64/configs/gki_defconfig"
-          echo "📝 Updating $CONFIG_FILE"
-        
-          sed -i '/CONFIG_CRYPTO_LZ4KD/d' "$CONFIG_FILE"
-          sed -i '/CONFIG_ZRAM_WRITEBACK/d' "$CONFIG_FILE"
-        
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_CRYPTO_LZ4KD=y
-          CONFIG_ZRAM_WRITEBACK=y
-          EOF
-          echo "✔ Configs updated successfully"
-        
-          # 5. Cleanup
-          rm -rf SukiSU_patch lz4kd.patch
-          echo "✅ ZRAM with LZ4KD Integration complete!"
-
-      - name: "🔧 Configure ADIOS IO"
-        # Check if the variant is KSU AND the input is 'on'
-        if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
-        working-directory: ${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo "Enabling ADIOS IO Scheduler..."
-          
-          # Use 'tee -a' or standard redirection without the leading './'
-          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> arch/arm64/configs/gki_defconfig
-          
-          echo "✔ Applied ADIOS IO successfully"
-
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -593,12 +469,24 @@ jobs:
 
           echo "✔ KernelSU installed successfully"
           
-          echo "📦 Cloning SUSFS4KSU..."
+          #KBUILD_FILE="kernel/Makefile"
+          #if [ -f "kernel/Kbuild" ]; then
+          #  KBUILD_FILE="kernel/Kbuild"
+          #fi
+          
+          echo "✔ KSUB installed successfully"
+          
+          echo "📦 Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
+          if [ ! -d "susfs4ksu" ]; then
+            echo "❌ ERROR: SUSFS4KSU clone failed!"
+            exit 1
+          fi
+          
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-
-          echo "🔧 Applying SUSFS kernel patch if possible...";
+          
+          echo "🔧 Applying SUSFS kernel patch..."
           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
             echo "✅ SUSFS patch successfully applied"
           else
@@ -606,18 +494,11 @@ jobs:
           fi
 
           echo "📄 Forcing SUSFS source injection..."
-
-          # Always replace fs/susfs.c
-          mkdir -p fs
+          mkdir -p fs include/linux
           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          echo "✔ Copied fs/susfs.c"
-
-          # Always replace include/linux/susfs.h
-          mkdir -p include/linux
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          echo "✔ Copied include/linux/susfs.h"
-
-          # NEW: Also install missing susfs_def.h
+          echo "✔ Copied main SUSFS core files"
+          
           if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
             cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
             echo "✔ Copied include/linux/susfs_def.h"
@@ -633,32 +514,69 @@ jobs:
 
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-
+      
           if [ -f "$KSU_PATCH" ]; then
             cd KernelSU
             if patch -p1 --dry-run < ../$KSU_PATCH >/dev/null; then
               patch -p1 < ../$KSU_PATCH && echo "✔ Applied KSU SUSFS patch"
               cd ..
             else
-              echo "⚠️ KSU SUSFS patch failed — applying manual fallback"
+              echo "⚠️ KSU SUSFS patch failed — applying manual fallback with precise sed syntax"
               cd ..
-              sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-              sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+              # FIX: Injects valid header inclusion and prevents compilation failure
+              sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+              sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+              echo "✔ Manually hooked susfs_init() inside ksu.c"
             fi
           else
-            echo "⚠️ KSU patch missing — manually injecting changes"
-            sed -i '/#include /a #include ' KernelSU/kernel/ksu.c
-            sed -i '/ksu_core_init()/a \tsusfs_init();' KernelSU/kernel/ksu.c
+            echo "⚠️ KSU_PATCH file not found — applying manual fallback with precise sed syntax"
+            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+            sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+            echo "✔ Manually hooked susfs_init() inside ksu.c"
           fi
+          echo "✔ Applied SUSFS -> KernelSU patch successfully"
 
           echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h KernelSU/kernel/ksu.c; do
             if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
 
-          rm -rf susfs4ksu
+          echo "🔍 Verifying and Registering SUSFS in Makefiles..."
+          # Fix: Forces the obj-y registration into every potential fs/Makefile in your workspace
+          MAKEFILES=$(find . -name "Makefile" | grep "fs/Makefile")
+          for mfile in $MAKEFILES; do
+            if ! grep -q "susfs.o" "$mfile"; then
+              echo "obj-y += susfs.o" >> "$mfile"
+              echo "✔ Registered susfs.o in $mfile"
+            fi
+          done
+
+          # Fix: Ensure the functions are declared globally exported if LTO is active
+          if [ -f "fs/susfs.c" ]; then
+            if ! grep -q "EXPORT_SYMBOL" fs/susfs.c; then
+              echo -e "\n#include <linux/export.h>\nEXPORT_SYMBOL(susfs_init);" >> fs/susfs.c
+              echo "✔ Appended global EXPORT_SYMBOL to fs/susfs.c"
+            fi
+          fi
+          
+          if [ ! -L "drivers/kernelsu" ]; then
+            ln -sf ../KernelSU/kernel drivers/kernelsu
+            echo "✔ Created drivers/kernelsu symlink"
+          fi
+
+          echo "⚠️ FORCING CONFIGURATIONS..."
+          # FIX: Cleans out duplicate symbols across both variants of defconfigs to prevent overrides
+          for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
+          if [ -f "$CONF" ]; then
+              echo "📝 Configuring $CONF"
+              sed -i '/CONFIG_KSU/d' "$CONF"
+              sed -i '/CONFIG_KPROBES/d' "$CONF"
+              sed -i '/CONFIG_KALLSYMS/d' "$CONF"
+          fi
+          done
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KSU_SUSFS=y
@@ -667,9 +585,9 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_KSTAT=y
           CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
           CONFIG_KSU_SUSFS_ENABLE_LOG=y
           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
@@ -678,6 +596,10 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
+          
+          echo "✔ KernelSU configs with SUSFS
+
+          rm -rf susfs4ksu
 
           echo "🎉 KernelSU kernel patches fully integrated"
 
