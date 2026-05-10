@@ -558,7 +558,15 @@ jobs:
           mkdir -p include/linux
           ln -sf $(pwd)/drivers/char/lrng/lrng.h include/linux/lrng.h
 
-          # 3. Link LRNG to the drivers/char build system
+          # 3. Fix the pointer type mismatch for chacha_init_consts
+          sed -i 's/(struct chacha_state \*)/(u32 *)/g' drivers/char/lrng/lrng_drng_chacha20.h
+
+          # 4. Fix potential chacha20_block signature mismatch for 5.15
+          # In 5.15, the parameters are often (u32 *state, u8 *stream) 
+          # instead of passing the whole struct.
+          sed -i 's/chacha20_block(chacha20->state,/chacha20_block((u32 *)chacha20->state,/' drivers/char/lrng/lrng_drng_chacha20.h
+
+          # 5. Link LRNG to the drivers/char build system
           if ! grep -q "lrng" drivers/char/Makefile; then
             echo "obj-\$(CONFIG_LRNG) += lrng/" >> drivers/char/Makefile
           fi
@@ -566,7 +574,7 @@ jobs:
             sed -i '/endmenu/i source "drivers/char/lrng/Kconfig"' drivers/char/Kconfig
           fi
 
-          # 4. Inject Defconfig
+          # 6. Inject Defconfig
           # Note: Removed trailing spaces and fixed potential double-injection
           sed -i '/CONFIG_LRNG/d' arch/arm64/configs/gki_defconfig
           cat >> arch/arm64/configs/gki_defconfig << 'EOF'
