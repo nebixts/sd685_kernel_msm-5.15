@@ -1035,6 +1035,28 @@ jobs:
           else
             echo "⚠️ SUSFS patch failed or already applied"
           fi
+
+          echo "🔧 Applying SUSFS -> KernelSU-Next integration..."
+          # KernelSU Next often requires different integration than official KSU.
+          # We copy the integration files first, then attempt to apply the patch.
+
+          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
+          fi
+
+          KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          (
+          cd KernelSU
+          # Using --fuzz=3 helps the patch tool ignore small line number differences
+          if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
+            echo "✅ KSU patch successfully applied"
+          else
+            echo "⚠️ KSU patch failed - trying manual integration"
+          # Manual fallback: Some KSUN versions don't need the .patch if you've copied the files above
+          # and enabled the CONFIG_KSU_SUSFS=y flag in your defconfig.
+          fi
+          )
         
           # Check if symlink is needed (Standard KSU uses drivers/kernelsu)
           if [ ! -d "drivers/kernelsu" ]; then
