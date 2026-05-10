@@ -624,13 +624,16 @@ jobs:
           echo "✅ ZRAM with LZ4KD Integration complete!"
 
       - name: "🔧 Configure ADIOS IO"
+        # Check if the variant is KSU AND the input is 'on'
         if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo "Enabling ADIOS IO Scheduler..."
-          # cd kernel_workspace
-          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
-          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          
+          # Use 'tee -a' or standard redirection without the leading './'
+          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> arch/arm64/configs/gki_defconfig
+          
           echo "✔ Applied ADIOS IO successfully"
           
       - name: "🔧 Add BBG Support (KSU variant only)"
