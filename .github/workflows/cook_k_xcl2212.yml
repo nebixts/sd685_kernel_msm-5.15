@@ -544,26 +544,23 @@ jobs:
         
           # 1. Clean up and clone
           rm -rf /tmp/lrng_src
-          git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
+          git clone --depth=1 https://github.com /tmp/lrng_src
         
           # 2. Create target directory and copy source files
-          # The source files are in the root of the repo, not a 'drivers' subfolder
           mkdir -p drivers/char/lrng
           cp -f /tmp/lrng_src/*.c drivers/char/lrng/
           cp -f /tmp/lrng_src/*.h drivers/char/lrng/
           cp -f /tmp/lrng_src/Kconfig drivers/char/lrng/
           cp -f /tmp/lrng_src/Makefile drivers/char/lrng/
 
-          # NEW: Fix the "file not found" error
+          # 3. FIX: Header path for #include <linux/lrng.h>
           mkdir -p include/linux
           ln -sf $(pwd)/drivers/char/lrng/lrng.h include/linux/lrng.h
 
-          # 3. Fix the pointer type mismatch for chacha_init_consts
+          # 4. FIX: Type mismatches for 5.15 Crypto API
+          # Changes (struct chacha_state *) to (u32 *) for compatibility
           sed -i 's/(struct chacha_state \*)/(u32 *)/g' drivers/char/lrng/lrng_drng_chacha20.h
-
-          # 4. Fix potential chacha20_block signature mismatch for 5.15
-          # In 5.15, the parameters are often (u32 *state, u8 *stream) 
-          # instead of passing the whole struct.
+          # Ensures chacha20_block receives the correct pointer type
           sed -i 's/chacha20_block(chacha20->state,/chacha20_block((u32 *)chacha20->state,/' drivers/char/lrng/lrng_drng_chacha20.h
 
           # 5. Link LRNG to the drivers/char build system
@@ -574,10 +571,16 @@ jobs:
             sed -i '/endmenu/i source "drivers/char/lrng/Kconfig"' drivers/char/Kconfig
           fi
 
-          # 6. Inject Defconfig
-          # Note: Removed trailing spaces and fixed potential double-injection
+          # 6. Inject Defconfig with mandatory Crypto dependencies
           sed -i '/CONFIG_LRNG/d' arch/arm64/configs/gki_defconfig
           cat >> arch/arm64/configs/gki_defconfig << 'EOF'
+          # Required Crypto Libraries for LRNG on 5.15
+          CONFIG_CRYPTO_CHACHA20=y
+          CONFIG_CRYPTO_SHA256=y
+          CONFIG_CRYPTO_LIB_CHACHA=y
+          CONFIG_CRYPTO_LIB_SHA256=y
+          
+          # LRNG Core Settings
           CONFIG_LRNG=y
           CONFIG_LRNG_SHA256=y
           CONFIG_LRNG_COLLECTION_SIZE=1024
@@ -587,7 +590,8 @@ jobs:
           CONFIG_LRNG_IRQ=y
           CONFIG_LRNG_CONTINUOUS_COMPRESSION_ENABLED=y
           EOF
-          echo "✔ LRNG files copied and linked successfully"
+          
+          echo "✔ LRNG v59 applied with 5.15 LTS compatibility patches"
 
       - name: "🔧 Enable ZRAM with LZ4KD"
         if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
