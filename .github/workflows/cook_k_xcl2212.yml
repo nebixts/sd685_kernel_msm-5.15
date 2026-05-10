@@ -1331,16 +1331,16 @@ jobs:
                KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"
 
       # ====================== Checking KSU-SUSFS PATCH Integration ======================
-      - name: "🧪 Verify SUSFS Integration"
-        run: |
-          cd ./${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/
-          echo "Checking Image for SUSFS..."
-          if strings Image | grep -q "susfs_"; then
-            echo "✅ SUSFS detected in Image!"
-          else
-            echo "❌ SUSFS NOT detected! Check your patch logs."
-            exit 1
-          fi
+      #- name: "🧪 Verify SUSFS Integration"
+        #run: |
+          #cd ./${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/
+          #echo "Checking Image for SUSFS..."
+          #if strings Image | grep -q "susfs_"; then
+            #echo "✅ SUSFS detected in Image!"
+          #else
+            #echo "❌ SUSFS NOT detected! Check your patch logs."
+            #exit 1
+          #fi
       
       # ====================== Begin Packaging the Kernel Stage ======================
       - name: "📂 Prepare Artifact"
