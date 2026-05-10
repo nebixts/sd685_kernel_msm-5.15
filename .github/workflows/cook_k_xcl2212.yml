@@ -78,14 +78,6 @@ on:
           - "600"
           - "750"
           - "1000"
-      bbg:
-        description: "Baseband-guard Support (if KSU Enabled)"
-        required: true
-        type: choice
-        default: "on"
-        options:
-          - "on"
-          - "off"
       swapSizeGB:
         description: "Optional swap size in GB to create on the runner (set 0 to disable)"
         required: false
@@ -110,6 +102,22 @@ on:
       adios_enable:
         description: 'Enable ADIOS IO Scheduler (Improves IO read/write performance)'
         required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+      mem_opt_patches:
+        description: 'Enable memory/scheduler optimization patches (from WildKernels)'
+        required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+      bbg:
+        description: "Baseband-guard Support (if KSU Enabled)"
+        required: true
         type: choice
         default: "on"
         options:
@@ -666,6 +674,51 @@ jobs:
           echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> arch/arm64/configs/gki_defconfig
           
           echo "✔ Applied ADIOS IO successfully"
+
+      - name: Apply Memory & Scheduler Optimization Patches
+        if: matrix.variant == 'ksu' && github.event.inputs.mem_opt_patches == 'on'
+        working-directory: ${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Applying WildKernels optimization patches..."
+          PATCHES_DIR="https://github.com/WildKernels/kernel_patches/main/common"
+
+          apply_patch() {
+            local patch="$1"
+            if [ -f "$PATCHES_DIR/$patch" ]; then
+              patch -p1 --forward < "$PATCHES_DIR/$patch" && \
+                echo "✅ $patch" || echo "⚠️ $patch (skipped/conflict)"
+            else
+              echo "⚠️ $patch not found, skipping"
+            fi
+          }
+
+          apply_patch "optimized_mem_operations.patch"
+          apply_patch "file_struct_8bytes_align.patch"
+          apply_patch "reduce_cache_pressure.patch"
+          apply_patch "mem_opt_prefetch.patch"
+          apply_patch "optimise_memcmp.patch"
+          apply_patch "minimise_wakeup_time.patch"
+          apply_patch "int_sqrt.patch"
+          apply_patch "force_tcp_nodelay.patch"
+          apply_patch "reduce_gc_thread_sleep_time.patch"
+          apply_patch "add_timeout_wakelocks_globally.patch"
+          apply_patch "f2fs_reduce_congestion.patch"
+          apply_patch "reduce_freeze_timeout.patch"
+          apply_patch "clear_page_16bytes_align.patch"
+          apply_patch "add_limitation_scaling_min_freq.patch"
+          apply_patch "re_write_limitation_scaling_min_freq.patch"
+          apply_patch "adjust_cpu_scan_order.patch"
+          apply_patch "avoid_extra_s2idle_wake_attempts.patch"
+          apply_patch "disable_cache_hot_buddy.patch"
+          apply_patch "f2fs_enlarge_min_fsync_blocks.patch"
+          apply_patch "increase_ext4_default_commit_age.patch"
+          apply_patch "increase_sk_mem_packets.patch"
+          apply_patch "reduce_pci_pme_wakeups.patch"
+          apply_patch "silence_irq_cpu_logspam.patch"
+          apply_patch "silence_system_logspam.patch"
+          apply_patch "use_unlikely_wrap_cpufreq.patch"
+
+          echo "✅ Optimization patches applied"
           
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
