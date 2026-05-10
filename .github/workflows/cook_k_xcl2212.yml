@@ -1045,11 +1045,11 @@ jobs:
             echo "✔ Copied SUSFS KernelSU integration files"
           fi
 
-          KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           
-          if [ -d "KernelSU" ]; then
+          if [ -d "KernelSU/kernel" ]; then
           (
-          cd KernelSU
+          cd KernelSU/kernel
           echo "Current directory: $(pwd)"
             if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
               echo "✅ KSU patch successfully applied"
