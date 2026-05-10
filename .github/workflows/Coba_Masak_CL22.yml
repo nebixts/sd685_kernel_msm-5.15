@@ -1,4 +1,4 @@
-name: "Coba_Masak_CL22c"
+name: "Coba_Masak_CL22"
 
 env:
   OUT_DIR: "out"
@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.4-G-22042026"
+        default: "-NeFaRiaN-3.5-G-10052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "wksu+susfs"
+        default: "kernelsu+susfs"
         options:
           - "kernelsu+susfs"
           - "wksu+susfs"
@@ -96,6 +96,30 @@ on:
         options:
           - "thin"
           - "full"
+      lz4kd:
+        description: "enable or disable zram lz4kd compression"
+        required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+      lrng_enable:
+        description: 'Enable LRNG v59 (better entropy for crypto/gaming)'
+        required: false
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
+      adios_enable:
+        description: 'Enable ADIOS IO Scheduler (Improves IO read/write performance)'
+        required: false
+        type: choice
+        default: "on"
+        options:
+          - "on"
+          - "off"
 
 jobs:
   Build-Kernel:
@@ -403,6 +427,36 @@ jobs:
           CONFIG_IP_SET_LIST_SET=y
           EOF
         
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_F2FS_FS=y
+          CONFIG_F2FS_STAT_FS=y
+          CONFIG_F2FS_FS_XATTR=y
+          CONFIG_F2FS_FS_POSIX_ACL=y
+          CONFIG_F2FS_FS_SECURITY=y
+          CONFIG_F2FS_FS_COMPRESSION=y
+          CONFIG_F2FS_FS_LZO=y
+          CONFIG_F2FS_FS_LZ4=y
+          CONFIG_F2FS_FS_ZSTD=y
+          EOF
+          
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_NF_CONNTRACK=y
+          CONFIG_NF_CONNTRACK_MARK=y
+          CONFIG_NF_CONNTRACK_ZONES=y
+          CONFIG_NF_CONNTRACK_TIMESTAMP=y
+          CONFIG_NF_CONNTRACK_EVENTS=y
+          CONFIG_NF_CONNTRACK_TIMEOUT=y
+          CONFIG_NF_CONNTRACK_LABELS=y
+          CONFIG_NF_NAT=y
+          CONFIG_NF_NAT_MASQUERADE=y
+          CONFIG_NETFILTER_XT_MATCH_HASHLIMIT=y
+          CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+          CONFIG_NETFILTER_XT_MATCH_CONNLIMIT=y
+          CONFIG_NETFILTER_XT_MATCH_STATE=y
+          CONFIG_NETFILTER_XT_TARGET_MASQUERADE=y
+          CONFIG_NETFILTER_XT_TARGET_REDIRECT=y
+          EOF
+        
           apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
@@ -411,6 +465,69 @@ jobs:
           echo "✅ Applied Extra TCP configs"
           echo "✅ Applied Networking Configuration"
           echo "✅ Applied IPSet Support"
+          echo "✅ Applied Enabling F2FS optimizations..."
+          echo "✅ Applied Enabling full Netfilter support..."
+
+      - name: "🔧 Enable LRNG v59"
+        if: matrix.variant == 'ksu' && github.event.inputs.lrng_enable == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Enabling LRNG (Linux Random Number Generator) v59..."
+          # LRNG patch from Epicmann24/SukiSU
+          git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
+          mkdir -p ./drivers/char/lrng
+          cp -f /tmp/lrng_src/drivers/char/lrng/* drivers/char/lrng/
+          cat >> arch/arm64/configs/gki_defconfig << 'EOF'
+          CONFIG_LRNG=y
+          CONFIG_LRNG_SHA256=y
+          CONFIG_LRNG_COLLECTION_SIZE=1024
+          CONFIG_LRNG_HEALTH_TESTS=y
+          CONFIG_LRNG_RCT_CUTOFF=31
+          CONFIG_LRNG_APT_CUTOFF=325
+          CONFIG_LRNG_IRQ=y
+          CONFIG_LRNG_CONTINUOUS_COMPRESSION_ENABLED=y
+          EOF
+          echo "✔ Applied LRNG v59 successfully"
+
+      - name: "🔧 Configure ADIOS IO"
+        if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Enabling ADIOS IO Scheduler..."
+          # cd kernel_workspace
+          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "✔ Applied ADIOS IO successfully"
+          
+      - name: "🔧 Add ZRAM LZ4KD"
+        if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Adding ZRAM..."
+          
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+          echo "✔ Applied git successfully"
+
+          echo "🚀 apply lz4kd patch..."
+            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux
+            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./lib
+            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto
+          echo "✔ Applied Copying Files successfully"
+         
+          echo "🔧 Applying patched..."
+         
+          echo "🚀 apply lz4kd 5.15 patch..."
+          # cd ./common
+            cp ../../SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
+            patch -p1 -F 3 < lz4kd.patch || true
+          echo "✔ Applied lz4kd patch successfully"
+
+          echo "📦 enable lz4kd compression..."
+          echo "CONFIG_CRYPTO_LZ4KD=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "CONFIG_ZRAM_WRITEBACK=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "✔ Applied Config successfully"
+          
+          echo "✅ Patching ZRAM applied successfully"
 
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
@@ -420,7 +537,7 @@ jobs:
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
-    
+          
       - name: "🔧 Setup KernelSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'kernelsu+susfs'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -497,7 +614,6 @@ jobs:
 
           rm -rf susfs4ksu
 
-          # Add KSU/KSUN/WKSU configs with SUSFS
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
