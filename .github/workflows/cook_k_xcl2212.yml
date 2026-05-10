@@ -660,6 +660,25 @@ jobs:
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
+          echo "🔗 Wiring KernelSU into the build system..."
+
+          # Ensure we are in the correct directory
+          DRIVER_MAKEFILE="drivers/Makefile"
+          DRIVER_KCONFIG="drivers/Kconfig"
+
+          # 1. Update Makefile
+          if ! grep -q "kernelsu" "$DRIVER_MAKEFILE"; then
+            echo "obj-\$(CONFIG_KSU) += kernelsu/" >> "$DRIVER_MAKEFILE"
+            echo "✅ Added KernelSU to drivers/Makefile"
+          fi
+
+          # 2. Update Kconfig
+          if ! grep -q "drivers/kernelsu/Kconfig" "$DRIVER_KCONFIG"; then
+          # Injects the source line before the last endmenu
+            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$DRIVER_KCONFIG"
+            echo "✅ Added KernelSU to drivers/Kconfig"
+          fi
+
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           sed -i '/CONFIG_KSU/d' "$CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
