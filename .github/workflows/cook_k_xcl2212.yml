@@ -654,6 +654,12 @@ jobs:
           #endif
           EOF
 
+          echo "🔧 Ensuring SUSFS is included in the build system..."
+          if ! grep -q "susfs.o" fs/Makefile; then
+            echo "obj-y += susfs.o" >> fs/Makefile
+            echo "✅ Added susfs.o to fs/Makefile"
+          fi
+
           # Create Symlink
           if [ ! -d "drivers/kernelsu" ]; then
             ln -sf ../KernelSU/kernel drivers/kernelsu
@@ -1285,17 +1291,6 @@ jobs:
 
           echo "🎉 KSUB with SUSFS Integration complete!"
 
-      - name: "🧪 Verify SUSFS Integration"
-        run: |
-          cd ./${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/
-          echo "Checking Image for SUSFS..."
-          if strings Image | grep -q "susfs_"; then
-            echo "✅ SUSFS detected in Image!"
-          else
-            echo "❌ SUSFS NOT detected! Check your patch logs."
-            exit 1
-          fi
-
       - name: "👍 Make defconfig"
         run: |
           TC_DIR="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
@@ -1335,6 +1330,18 @@ jobs:
                CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
                KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"
 
+      # ====================== Checking KSU-SUSFS PATCH Integration ======================
+      - name: "🧪 Verify SUSFS Integration"
+        run: |
+          cd ./${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/
+          echo "Checking Image for SUSFS..."
+          if strings Image | grep -q "susfs_"; then
+            echo "✅ SUSFS detected in Image!"
+          else
+            echo "❌ SUSFS NOT detected! Check your patch logs."
+            exit 1
+          fi
+      
       # ====================== Begin Packaging the Kernel Stage ======================
       - name: "📂 Prepare Artifact"
         run: |
