@@ -736,6 +736,10 @@ jobs:
           else
             echo "⚠️ Could not find KSU Makefile to inject version"
           fi
+
+          # This will make the version appear in the 'cc1' command lines in the log
+          export KCFLAGS="-DSUSFS_VERSION=\\\"v2.1.0\\\""
+
           
       - name: "🛠️ Setup Wild KSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'WKSU'
