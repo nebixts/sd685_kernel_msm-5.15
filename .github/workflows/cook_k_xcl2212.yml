@@ -621,59 +621,47 @@ jobs:
           echo "📦 Cloning SUSFS4KSU..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
     
-          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          echo "🔧 Applying SUSFS kernel patch..."
-          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
-            echo "✅ SUSFS patch successfully applied"
-          else
-            echo "⚠️ SUSFS patch failed — copying files manually"
-          fi
+          # Apply Core Kernel Patch (FS, MM, SELinux)
+          echo "🔧 Applying SUSFS core kernel patch..."
+          SUSFS_CORE_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          patch -p1 --forward < "$SUSFS_CORE_PATCH" || echo "⚠️ Core patch skipped"
 
-          echo "📄 Forcing SUSFS source injection..."
-          mkdir -p fs include/linux
-          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          echo "✔ Copied main SUSFS core files"
-        
-          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "✔ Copied include/linux/susfs_def.h"
-          fi
+          # Copy SUSFS Header & Source files
+          echo "📂 Copying SUSFS source files..."
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
 
-          echo "📦 Injecting SUSFS -> KernelSU integration files"
+          # Manual Integration (Bypass the broken .patch file)
+          echo "🔧 Integrating SUSFS into KernelSU manually..."
+          # Copy integration headers if they exist
           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
-            echo "✔ Copied SUSFS KernelSU integration files"
-          else
-            echo "ℹ Source integration patches directory missing, continuing to raw codebase modifications"
           fi
 
-          KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-    
-          echo "🔧 Applying KSU patch..."
-          if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
-            echo "✅ KSU patch successfully applied"
-          else
-            echo "⚠️ KSU patch failed — copying files manually"
-          fi
-
-          echo "🔧 Patching sucompat.c manually..."
+          # Inject include into sucompat.c
           if [ -f "KernelSU/kernel/sucompat.c" ]; then
             sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/sucompat.c
+            echo "✅ Injected susfs.h into sucompat.c"
           fi
 
-          if [ -f "include/linux/susfs_def.h" ]; then
-              cat >> include/linux/susfs_def.h << 'EOF'
-              EOF
-          fi
+          # Fix missing SUS_SU definitions in header
+          cat >> include/linux/susfs_def.h << 'EOF'
+          #ifndef SUS_SU_DISABLED
+          #define SUS_SU_DISABLED 0
+          #define SUS_SU_WITH_HOOKS 1
+          #define SUS_SU_WITHOUT_HOOKS 2
+          #endif
+          EOF
 
-          if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
-            echo "✔ Created drivers/kernelsu symlink successfully"
+          # Create Symlink
+          if [ ! -d "drivers/kernelsu" ]; then
+            ln -sf ../KernelSU/kernel drivers/kernelsu
+            echo "✔ Created drivers/kernelsu symlink"
           fi
 
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          sed -i '/CONFIG_KSU/d' "$CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KPROBES=y
