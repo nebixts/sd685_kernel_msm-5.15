@@ -554,6 +554,10 @@ jobs:
           cp -f /tmp/lrng_src/Kconfig drivers/char/lrng/
           cp -f /tmp/lrng_src/Makefile drivers/char/lrng/
 
+          # NEW: Fix the "file not found" error
+          mkdir -p include/linux
+          ln -sf $(pwd)/drivers/char/lrng/lrng.h include/linux/lrng.h
+
           # 3. Link LRNG to the drivers/char build system
           if ! grep -q "lrng" drivers/char/Makefile; then
             echo "obj-\$(CONFIG_LRNG) += lrng/" >> drivers/char/Makefile
