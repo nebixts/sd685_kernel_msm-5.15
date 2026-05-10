@@ -557,25 +557,6 @@ jobs:
           EOF
           echo "✔ Applied LRNG v59 successfully"
 
-      - name: "🔧 Configure ADIOS IO"
-        if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo "Enabling ADIOS IO Scheduler..."
-          # cd kernel_workspace
-          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
-          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
-          echo "✔ Applied ADIOS IO successfully"
-          
-      - name: "🔧 Add BBG Support (KSU variant only)"
-        if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo "Adding BBG...";
-          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
-          echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
-
       - name: "🔧 Add ZRAM LZ4KD"
         if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -605,7 +586,26 @@ jobs:
           echo "✔ Applied Config successfully"
           
           echo "✅ Patching ZRAM applied successfully"
-     
+
+      - name: "🔧 Configure ADIOS IO"
+        if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Enabling ADIOS IO Scheduler..."
+          # cd kernel_workspace
+          echo "CONFIG_MQ_IOSCHED_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y" >> ./arch/arm64/configs/gki_defconfig
+          echo "✔ Applied ADIOS IO successfully"
+          
+      - name: "🔧 Add BBG Support (KSU variant only)"
+        if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          echo "Adding BBG...";
+          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
+          
       # ====================== Begin Processing Root Kernel  base of KernelSU Stage ======================
       - name: "🛠️ Setup KernelSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KERNELSU'
