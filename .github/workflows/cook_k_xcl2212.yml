@@ -532,7 +532,7 @@ jobs:
           apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
 
           # IPv6 NAT fix from WildKernels
-          IPNAT_FIX="../wildkernels_patches/common/IPv6_NAT_FIX.patch"
+          IPNAT_FIX="https://github.com/WildKernels/kernel_patches/main/common/IPv6_NAT_FIX.patch"
           if [ -f "$IPNAT_FIX" ]; then
             patch -p1 -F 3 < "$IPNAT_FIX" || true
             echo "✅ IPv6 NAT fix applied"
