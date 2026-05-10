@@ -1014,10 +1014,10 @@ jobs:
         run: |
           set -e
           # Clean up existing KSU if present
-          rm -rf ./KernelSU ./drivers/kernelsu
+          rm -rf ./KernelSU/kernel ./drivers/kernelsu
         
           # Install KSUN
-          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next-susfs-a13-5.15-dev/kernel/setup.sh" | bash -s next-susfs-a13-5.15-dev
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s dev
           echo "✔ KSUN installed successfully"
         
           echo "📦 Cloning SUSFS4KSU for kernel patches..."
@@ -1047,7 +1047,7 @@ jobs:
 
           KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           (
-          cd KernelSU
+          cd KernelSU/kernel
           # Using --fuzz=3 helps the patch tool ignore small line number differences
           if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
             echo "✅ KSU patch successfully applied"
