@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-10052026"
+        default: "-NeFaRiaN-3.5-G-11052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -54,6 +54,7 @@ on:
           - "KOWSU"
           - "KSUN"
           - "KSUB"
+          - "KSUBS"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -1417,6 +1418,96 @@ jobs:
           rm -rf susfs4ksu
 
           echo "🎉 KSUB with SUSFS Integration complete!"
+
+      - name: "🔧 Setup KSUBS with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUBS'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+           # Clean up previous attempts
+           rm -rf ./KernelSU ./drivers/kernelsu ./susfs4ksu
+
+           echo "📦 Installing KSUBS..."
+           # Recommendation: Use a stable tag instead of 'main' to keep patches compatible
+           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/master/kernel/setup.sh" | bash -s master
+
+           echo "📦 Cloning SUSFS4KSU..."
+           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+
+           # 1. CORE FILES INJECTION
+           echo "📄 Injecting SUSFS source files..."
+           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
+           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
+           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
+
+           # 2. KERNEL PATCHING
+           echo "🔧 Applying SUSFS kernel patch..."
+           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+             echo "✅ SUSFS kernel patch applied"
+           else
+             echo "⚠️ Kernel patch failed, proceeding with manual file injection"
+           fi
+
+           # 3. KERNELSU INTEGRATION
+           echo "📦 Integrating SUSFS into KernelSU..."
+           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+           fi
+
+           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+           if [ -f "$KSU_PATCH" ]; then
+             cd KernelSU && patch -p1 < ../$KSU_PATCH || echo "⚠️ KSU patch failed, using sed" && cd ..
+           fi
+
+           # Manual Hooking (Fallback/Double Check)
+           if ! grep -q "susfs_init" KernelSU/kernel/ksu.c; then
+             sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/ksu.c
+             sed -i '/ksu_core_init()/a \\tsusfs_init();' KernelSU/kernel/ksu.c
+           fi
+
+           # 4. FIXED MAKEFILE REGISTRATION (The cause of your error)
+           echo "🔍 Registering susfs.o in fs/Makefile..."
+           if [ -f "fs/Makefile" ]; then
+           # Remove any existing accidental entries first to avoid duplicates
+             sed -i '/susfs.o/d' fs/Makefile
+             echo "obj-y += susfs.o" >> fs/Makefile
+           fi
+
+           # 5. SYMLINK
+           if [ ! -L "drivers/kernelsu" ]; then
+             ln -sf ../KernelSU/kernel drivers/kernelsu
+           fi
+
+           # 6. CONFIGURATION
+           echo "📝 Applying Defconfig Settings..."
+           for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
+           if [ -f "$CONF" ]; then
+             sed -i '/CONFIG_KSU/d' "$CONF"
+           cat >> "$CONF" << 'EOF'
+           CONFIG_KSU=y
+           CONFIG_KSU_SUSFS=y
+           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+           CONFIG_KSU_SUSFS_SUS_PATH=y
+           CONFIG_KSU_SUSFS_SUS_MOUNT=y
+           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+           CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+           CONFIG_KSU_SUSFS_SUS_KSTAT=y
+           CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+           CONFIG_KSU_SUSFS_ENABLE_LOG=y
+           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+           CONFIG_KSU_SUSFS_SUS_MAP=y
+           CONFIG_KSU_SUSFS_SUS_SU=y
+           EOF
+           fi
+           done
+
+           rm -rf susfs4ksu
+           echo "🎉 KSUBS with SUSFS kernel patches fully integrated!"
+
 
       - name: "👍 Make defconfig"
         run: |
