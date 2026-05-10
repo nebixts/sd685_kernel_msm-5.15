@@ -709,7 +709,28 @@ jobs:
           rm -rf susfs4ksu
           
           echo "🎉 KERNELSU with SUSFS Setup Complete"
+
+          echo "🔧 Adding SUSFS version reporting to KSU Makefile..."
+
+          # Define the version you are using
+          SUSFS_VERSION="v2.1.0"
+          KSU_MAKEFILE="KernelSU/kernel/Makefile"
+
+          if [ -f "$KSU_MAKEFILE" ]; then
+          # Inject the SUSFS version into the compiler flags
+          sed -i "s/^ccflags-y += -D$(grep -o 'KSU_VERSION=[0-9]*' $KSU_MAKEFILE)/& -DSUSFS_VERSION=\\\\\"$SUSFS_VERSION\\\\\"/" "$KSU_MAKEFILE"
     
+          # Also add it to the printk log in KernelSU's init.c so it shows in dmesg
+          INIT_FILE="KernelSU/kernel/core/init.c"
+          if [ -f "$INIT_FILE" ]; then
+            sed -i 's/pr_info("KernelSU version: %s\\n", KSU_VERSION);/pr_info("KernelSU version: %s | SUSFS version: %s\\n", KSU_VERSION, SUSFS_VERSION);/' "$INIT_FILE"
+            echo "✅ Version reporting added to init.c"
+          fi
+            echo "✅ SUSFS version injected into Makefile"
+          else
+            echo "⚠️ Could not find KSU Makefile to inject version"
+          fi
+          
       - name: "🛠️ Setup Wild KSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'WKSU'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -1263,6 +1284,17 @@ jobs:
           rm -rf susfs4ksu
 
           echo "🎉 KSUB with SUSFS Integration complete!"
+
+      - name: "🧪 Verify SUSFS Integration"
+        run: |
+          cd ./${{ env.kernelDir }}/${{ env.kernelName }}/out/arch/arm64/boot/
+          echo "Checking Image for SUSFS..."
+          if strings Image | grep -q "susfs_"; then
+            echo "✅ SUSFS detected in Image!"
+          else
+            echo "❌ SUSFS NOT detected! Check your patch logs."
+            exit 1
+          fi
 
       - name: "👍 Make defconfig"
         run: |
