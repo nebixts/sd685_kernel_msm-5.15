@@ -1410,11 +1410,12 @@ jobs:
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" ./*
           cd ..
-          echo "ZIP_FILENAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: NeFaRiaN-XCL22
-          path: ${{ env.ZIP_FILENAME }}
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_PATH }}
           retention-days: 7
