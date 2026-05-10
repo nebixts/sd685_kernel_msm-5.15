@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "KSUN"
+        default: "KERNELSU"
         options:
           - "KERNELSU"
           - "WKSU"
@@ -649,13 +649,23 @@ jobs:
             echo "ℹ Source integration patches directory missing, continuing to raw codebase modifications"
           fi
 
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-      
+          KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+    
           echo "🔧 Applying KSU patch..."
-          if patch -p1 < "$KSU_PATCH"; then
+          if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
             echo "⚠️ KSU patch failed — copying files manually"
+          fi
+
+          echo "🔧 Patching sucompat.c manually..."
+          if [ -f "KernelSU/kernel/sucompat.c" ]; then
+            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/sucompat.c
+          fi
+
+          if [ -f "include/linux/susfs_def.h" ]; then
+              cat >> include/linux/susfs_def.h << 'EOF'
+              EOF
           fi
 
           if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
