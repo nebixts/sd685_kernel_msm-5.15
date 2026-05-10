@@ -540,11 +540,31 @@ jobs:
         if: matrix.variant == 'ksu' && github.event.inputs.lrng_enable == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          echo "Enabling LRNG (Linux Random Number Generator) v59..."
-          # LRNG patch from Epicmann24/SukiSU
+          echo "Enabling LRNG (Linux Random Number Generator)..."
+        
+          # 1. Clean up and clone
+          rm -rf /tmp/lrng_src
           git clone --depth=1 https://github.com/smuellerDD/lrng.git /tmp/lrng_src
-          mkdir -p ./drivers/char/lrng
-          cp -f /tmp/lrng_src/drivers/char/lrng/* drivers/char/lrng/
+        
+          # 2. Create target directory and copy source files
+          # The source files are in the root of the repo, not a 'drivers' subfolder
+          mkdir -p drivers/char/lrng
+          cp -f /tmp/lrng_src/*.c drivers/char/lrng/
+          cp -f /tmp/lrng_src/*.h drivers/char/lrng/
+          cp -f /tmp/lrng_src/Kconfig drivers/char/lrng/
+          cp -f /tmp/lrng_src/Makefile drivers/char/lrng/
+
+          # 3. Link LRNG to the drivers/char build system
+          if ! grep -q "lrng" drivers/char/Makefile; then
+            echo "obj-\$(CONFIG_LRNG) += lrng/" >> drivers/char/Makefile
+          fi
+          if ! grep -q "lrng" drivers/char/Kconfig; then
+            sed -i '/endmenu/i source "drivers/char/lrng/Kconfig"' drivers/char/Kconfig
+          fi
+
+          # 4. Inject Defconfig
+          # Note: Removed trailing spaces and fixed potential double-injection
+          sed -i '/CONFIG_LRNG/d' arch/arm64/configs/gki_defconfig
           cat >> arch/arm64/configs/gki_defconfig << 'EOF'
           CONFIG_LRNG=y
           CONFIG_LRNG_SHA256=y
@@ -555,37 +575,53 @@ jobs:
           CONFIG_LRNG_IRQ=y
           CONFIG_LRNG_CONTINUOUS_COMPRESSION_ENABLED=y
           EOF
-          echo "✔ Applied LRNG v59 successfully"
+          echo "✔ LRNG files copied and linked successfully"
 
-      - name: "🔧 Add ZRAM LZ4KD"
+      - name: "🔧 Enable ZRAM with LZ4KD"
         if: matrix.variant == 'ksu' && github.event.inputs.lz4kd == 'on'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          echo "Adding ZRAM..."
-          
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          echo "✔ Applied git successfully"
+          echo "🚀 Preparing ZRAM and LZ4KD..."
+        
+          # 1. Clean up and Clone the patch repository
+          rm -rf SukiSU_patch
+          git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git
+          echo "✔ Repository cloned successfully"
 
-          echo "🚀 apply lz4kd patch..."
-            cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux
-            cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./lib
-            cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./crypto
-          echo "✔ Applied Copying Files successfully"
+          # 2. Copy LZ4KD source files
+          # The paths are relative to the current directory where you cloned the repo
+          echo "📦 Copying LZ4KD source files..."
+          cp -rf SukiSU_patch/other/zram/lz4k/include/linux/* ./include/linux/
+          cp -rf SukiSU_patch/other/zram/lz4k/lib/* ./lib/
+          cp -rf SukiSU_patch/other/zram/lz4k/crypto/* ./crypto/
+          echo "✔ Files copied successfully"
          
-          echo "🔧 Applying patched..."
-         
-          echo "🚀 apply lz4kd 5.15 patch..."
-          # cd ./common
-            cp ../../SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
-            patch -p1 -F 3 < lz4kd.patch || true
-          echo "✔ Applied lz4kd patch successfully"
+          # 3. Apply the 5.15 kernel patch
+          echo "🔧 Applying lz4kd patch for kernel 5.15..."
+          cp SukiSU_patch/other/zram/zram_patch/5.15/lz4kd.patch ./
+          if patch -p1 --forward < lz4kd.patch; then
+            echo "✅ LZ4KD patch successfully applied"
+          else
+            echo "⚠️ Patch already applied or failed (skipping)"
+          fi
 
-          echo "📦 enable lz4kd compression..."
-          echo "CONFIG_CRYPTO_LZ4KD=y" >> ./arch/arm64/configs/gki_defconfig
-          echo "CONFIG_ZRAM_WRITEBACK=y" >> ./arch/arm64/configs/gki_defconfig
-          echo "✔ Applied Config successfully"
-          
-          echo "✅ Patching ZRAM applied successfully"
+          # 4. Enable configurations in Defconfig
+          # Using sed to prevent duplicates if the build is re-run
+          CONFIG_FILE="arch/arm64/configs/gki_defconfig"
+          echo "📝 Updating $CONFIG_FILE"
+        
+          sed -i '/CONFIG_CRYPTO_LZ4KD/d' "$CONFIG_FILE"
+          sed -i '/CONFIG_ZRAM_WRITEBACK/d' "$CONFIG_FILE"
+        
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_CRYPTO_LZ4KD=y
+          CONFIG_ZRAM_WRITEBACK=y
+          EOF
+          echo "✔ Configs updated successfully"
+        
+          # 5. Cleanup
+          rm -rf SukiSU_patch lz4kd.patch
+          echo "✅ ZRAM with LZ4KD Integration complete!"
 
       - name: "🔧 Configure ADIOS IO"
         if: matrix.variant == 'ksu' && github.event.inputs.adios_enable == 'on'
