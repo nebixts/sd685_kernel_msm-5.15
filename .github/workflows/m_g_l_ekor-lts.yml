@@ -1,7 +1,13 @@
 name: Merge Stable Kernel
 
 on:
-  workflow_dispatch: # Allows you to run it manually from the Actions tab
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: write
+  issues: write
 
 jobs:
   merge-kernel:
@@ -10,25 +16,69 @@ jobs:
       - name: Checkout local repository
         uses: actions/checkout@v4
         with:
-          ref: google # <--- Target your branch here
-          fetch-depth: 0 # Fetches all history for a proper merge
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: google
+          fetch-depth: 0
 
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "github-actions[bot]@://github.com"
 
       - name: Add Upstream Remote
         run: |
           git remote add linux-stable https://kernel.org
           git fetch linux-stable --tags
 
-      - name: Merge Tag 5.15.203
+      - name: Auto-Detect & Safe Merge
+        id: merge_step
         run: |
-          # Merges the specific stable tag into your current branch
-          git merge v5.15.203 --no-edit --allow-unrelated-histories
+          LATEST_TAG=$(git tag -l "v5.15.*" | sort -V | tail -n 1)
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           
+          if ! git merge-base google "$LATEST_TAG" > /dev/null; then
+             echo "❌ Error: Unrelated histories."
+             exit 1
+          fi
+
+          echo "Merging $LATEST_TAG..."
+          git merge "$LATEST_TAG" --no-edit
+
       - name: Push Changes
-        run: |
-          git push origin google
+        run: git push origin google
+
+      - name: Close Conflict Issue on Success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              creator: 'github-actions[bot]'
+            });
+            
+            for (const issue of issues.data) {
+              if (issue.title.includes('Merge Conflict: Stable Kernel')) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  body: '✅ Conflict resolved by successful automated merge.'
+                });
+              }
+            }
+
+      - name: Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = "${{ steps.merge_step.outputs.tag }}";
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Merge Conflict: Stable Kernel ${tag}`,
+              body: `Automated merge of **${tag}** failed. Please resolve manually.`
+            })
