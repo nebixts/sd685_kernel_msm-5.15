@@ -1046,17 +1046,21 @@ jobs:
           fi
 
           KSU_PATCH="../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          
+          if [ -d "KernelSU" ]; then
           (
-          cd KernelSU/kernel
-          # Using --fuzz=3 helps the patch tool ignore small line number differences
-          if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
-            echo "✅ KSU patch successfully applied"
-          else
-            echo "⚠️ KSU patch failed - trying manual integration"
-          # Manual fallback: Some KSUN versions don't need the .patch if you've copied the files above
-          # and enabled the CONFIG_KSU_SUSFS=y flag in your defconfig.
-          fi
+          cd KernelSU
+          echo "Current directory: $(pwd)"
+            if patch -p1 --forward --fuzz=3 < "$KSU_PATCH"; then
+              echo "✅ KSU patch successfully applied"
+            else
+            echo "⚠️ KSU patch failed - Proceeding with manual file copy logic"
+            fi
           )
+          else
+          echo "❌ Error: KernelSU directory not found!"
+          exit 1
+          fi
         
           # Check if symlink is needed (Standard KSU uses drivers/kernelsu)
           if [ ! -d "drivers/kernelsu" ]; then
