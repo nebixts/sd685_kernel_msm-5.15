@@ -992,12 +992,6 @@ jobs:
           echo "🔗 Linking drivers/kernelsu..."
           mkdir -p drivers
           ln -sf ../KernelSU-Next/kernel drivers/kernelsu
-
-          # 4. Verification Map
-          echo "🔍 Verifying integrity..."
-          for f in fs/susfs.c include/linux/susfs.h "$KSU_NEXT_DIR/ksu.c" "drivers/kernelsu/ksu.c"; do
-          if [ -f "$f" ] || [ -L "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
   
           # 5. Config injection
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
