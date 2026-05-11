@@ -1466,7 +1466,7 @@ jobs:
            # 3. KERNELSU INTEGRATION (Non-Kprobe Version)
            echo "📦 Integrating SUSFS into KernelSU..."
            # The standard location after setup.sh is drivers/kernelsu
-           KSU_DIR="/kernel"
+           KSU_DIR="/KernelSU"
 
            if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
              cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_DIR/"
