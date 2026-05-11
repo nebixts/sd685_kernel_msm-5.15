@@ -541,7 +541,7 @@ jobs:
           apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
 
           # IPv6 NAT fix from WildKernels
-          IPNAT_FIX="https://raw.githubusercontent.com/WildKernels/kernel_patches/main/common/IPv6_NAT_FIX.patch"
+          IPNAT_FIX="https://raw.githubusercontent.com/nebixts/kernel_patches/main/IPv6_NAT_FIX.patch"
           if [ -f "$IPNAT_FIX" ]; then
             patch -p1 -F 3 < "$IPNAT_FIX" || true
             echo "✅ IPv6 NAT fix applied"
@@ -681,8 +681,8 @@ jobs:
         working-directory: ${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo "Applying WildKernels optimization patches..."
-          PATCHES_DIR="https://raw.githubusercontent.com/WildKernels/kernel_patches/main/common"
-
+          PATCHES_DIR="https://raw.githubusercontent.com/ahmed-alnassif/GKI-Duchamp/master/kernel-patches/common"
+          
           apply_patch() {
             local patch="$1"
             if [ -f "$PATCHES_DIR/$patch" ]; then
@@ -1466,7 +1466,7 @@ jobs:
            # 3. KERNELSU INTEGRATION (Non-Kprobe Version)
            echo "📦 Integrating SUSFS into KernelSU..."
            # The standard location after setup.sh is drivers/kernelsu
-           KSU_DIR="drivers/kernelsu"
+           KSU_DIR="/KernelSU/kernel"
 
            if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
              cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_DIR/"
