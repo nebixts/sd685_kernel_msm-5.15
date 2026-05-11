@@ -1439,7 +1439,7 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
            # Clean up previous attempts
-           rm -rf ./KernelSU/kernel ./drivers/kernelsu ./susfs4ksu
+           rm -rf ./KernelSU ./drivers/kernelsu ./susfs4ksu
 
            echo "📦 Installing KSUBS..."
            # Recommendation: Use a stable tag instead of 'main' to keep patches compatible
@@ -1463,45 +1463,9 @@ jobs:
              echo "⚠️ Kernel patch failed, proceeding with manual file injection"
            fi
 
-           # 3. KERNELSU INTEGRATION (Non-Kprobe Version)
-           echo "📦 Integrating SUSFS into KernelSU..."
-           # The standard location after setup.sh is drivers/kernelsu
-           KSU_DIR="/KernelSU"
-
            if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* "$KSU_DIR/"
-           fi
-
-           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-           if [ -f "$KSU_PATCH" ]; then
-           # Adjusting path depth for the patch command
-             cd "$KSU_DIR" && patch -p1 < ../../$KSU_PATCH || echo "⚠️ KSU patch failed" && cd ../..
-           fi
-
-           # Manual Hooking for Non-Kprobe (Fixes your grep/sed error)
-           echo "🔧 Applying manual hooks to $KSU_DIR/ksu.c..."
-           if [ -f "$KSU_DIR/ksu.c" ]; then
-           # Add the header if missing
-           if ! grep -q "susfs.h" "$KSU_DIR/ksu.c"; then
-             sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' "$KSU_DIR/ksu.c"
-           fi
-           # Add the init call if missing (Crucial for non-kprobe)
-           if ! grep -q "susfs_init" "$KSU_DIR/ksu.c"; then
-             sed -i '/ksu_core_init()/a \\tsusfs_init();' "$KSU_DIR/ksu.c"
-           fi
-           echo "✅ Manual hooks applied to ksu.c"
-           else
-           echo "❌ Error: $KSU_DIR/ksu.c not found! Check setup.sh output."
-           exit 1
-           fi
-
-
-           # 4. FIXED MAKEFILE REGISTRATION (The cause of your error)
-           echo "🔍 Registering susfs.o in fs/Makefile..."
-           if [ -f "fs/Makefile" ]; then
-           # Remove any existing accidental entries first to avoid duplicates
-             sed -i '/susfs.o/d' fs/Makefile
-             sed -i 'obj-y += susfs.o' >> fs/Makefile
+            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
+            echo "✔ Copied SUSFS KernelSU integration files"
            fi
 
            # 5. SYMLINK
