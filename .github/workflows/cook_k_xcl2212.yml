@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-11052026"
+        default: "-NeFaRiaN-3.5-G-13052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "KERNELSU"
+        default: "WKSU"
         options:
           - "KERNELSU"
           - "WKSU"
@@ -850,7 +850,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Installing WildKSU
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/nebixts/Wild_KSU/canary/kernel/setup.sh" | bash -s canary
           # 2190b4a9e1203d282b87092c3452361dc7b1d2e4
       
           echo "✔ Wild KSU installed successfully"
@@ -933,7 +933,6 @@ jobs:
           echo "✔ Wild KSU configs with SUSFS added"
 
           rm -rf susfs4ksu
-          
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
 
       - name: "🛠️ Setup NEXT with SUSFS"
@@ -949,7 +948,7 @@ jobs:
   
           echo "📦 Installing NEXT..."
           # The setup script usually clones into KernelSU-Next automatically
-          curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
           echo "✔ NEXT installed successfully"
 
           # 1. Get KSU Version and patch Makefile
