@@ -850,7 +850,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Installing WildKSU
-          curl -LSs "https://raw.githubusercontent.com/nebixts/Wild_KSU/canary/kernel/setup.sh" | bash -s canary
+          curl -LSs "https://raw.githubusercontent.com/nebixts/wksu/canary/kernel/setup.sh" | bash -s canary
           # 2190b4a9e1203d282b87092c3452361dc7b1d2e4
       
           echo "✔ Wild KSU installed successfully"
