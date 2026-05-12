@@ -948,7 +948,7 @@ jobs:
   
           echo "📦 Installing NEXT..."
           # The setup script usually clones into KernelSU-Next automatically
-          curl -LSs "https://raw.githubusercontent.com/nebixts/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+          curl -LSs "https://raw.githubusercontent.com/nebixts/KSUN/dev/kernel/setup.sh" | bash -s dev
           echo "✔ NEXT installed successfully"
 
           # 1. Get KSU Version and patch Makefile
