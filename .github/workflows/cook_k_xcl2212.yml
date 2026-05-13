@@ -1131,6 +1131,19 @@ jobs:
           echo "✔ KSUN configs added"
          
           echo "✅ Installed KSUN Successfully"
+
+          # Apply SUSFS patch
+          PATCH_URL="https://api.github.com/repos/yougotme101/kernel_patches/releases/latest"
+          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
+          
+          if [ -n "$SUSFS_PATCH" ]; then
+            curl -L -o susfs.patch "$SUSFS_PATCH"
+            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
+          fi
+
+          # Apply syscall hooks
+          curl -L -o hooks.patch "https://raw.githubusercontent.com/yougotme101/kernel_patches/main/scope_min_manual_hooks_v1.6.patch"
+          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
            
       - name: "👍 Make defconfig"
         run: |
