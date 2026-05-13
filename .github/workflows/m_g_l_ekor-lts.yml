@@ -26,7 +26,7 @@ jobs:
 
       - name: Add Upstream Remote
         run: |
-          git remote add linux-stable https://kernel.org
+          git remote add linux-stable https://android.googlesource.com/kernel/common
           git fetch linux-stable --tags
 
       - name: Auto-Detect & Safe Merge
