@@ -1045,7 +1045,7 @@ jobs:
           echo "✅ SUSFS patch successfully applied"
 
           echo "📦 Applying hide_stuff & manual_hooks..."
-          curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
+          #curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
           curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch " | patch -p1 --fuzz=3 || echo "⚠️ Manual hook patch skipped"
           echo "✅ hide_stuff & manual_hooks patch successfully applied"
         
