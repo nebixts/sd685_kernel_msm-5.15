@@ -51,6 +51,7 @@ on:
           - "KERNELSU"
           - "WKSU"
           - "NEXT"
+          - "NEXT2"
           - "KOWSU"
           - "KSUN"
       optimizationLevel:
@@ -1024,6 +1025,70 @@ jobs:
 
           rm -rf susfs4ksu
           echo "🎉 NEXT with SUSFS Integration complete!"
+
+      - name: "🛠️ Setup NEXT2 with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT2'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -e
+          echo "🧹 Cleaning old KSUN/NEXT..."
+          rm -rf KernelSU-Next drivers/kernelsu
+  
+          echo "📦 Installing NEXT2..."
+          # The setup script usually clones into KernelSU-Next automatically
+          curl -LSs "https://raw.githubusercontent.com/nebixts/KSUN/dev/kernel/setup.sh" | bash -s dev
+          echo "✔ NEXT2 installed successfully"
+
+          # Get KSU Version and patch Makefile
+          KSU_VERSION=$(expr $(curl -sI "https://api.github.com/repos/nebixts/KSUN/commits?sha=dev&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p') "+" 30000)
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          sed -i "s/DKSU_VERSION=11998/DKSU_VERSION=${KSU_VERSION}/" $KSU_NEXT_DIR/Makefile
+
+          # Apply SUSFS patch
+          PATCH_URL="https://api.github.com/repos/nebixts/kernel_patches/releases/latest"
+          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
+          
+          if [ -n "$SUSFS_PATCH" ]; then
+            curl -L -o susfs.patch "$SUSFS_PATCH"
+            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
+          fi
+          echo "✅ SUSFS patch successfully applied"
+
+          echo "📦 Applying hide_stuff & manual_hooks..."
+          curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
+          curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch " | patch -p1 --fuzz=3 || echo "⚠️ Manual hook patch skipped"
+          echo "✅ SUSFS patch successfully applied"
+        
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
+          # Use grep to check if KSU is already defined to avoid duplicates
+          if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+          fi
+
+          rm -rf susfs4ksu
+          echo "🎉 NEXT2 with SUSFS Integration complete!"
     
       - name: "🔧 Setup KowSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KOWSU'
@@ -1132,19 +1197,6 @@ jobs:
          
           echo "✅ Installed KSUN Successfully"
 
-          # Apply SUSFS patch
-          PATCH_URL="https://api.github.com/repos/yougotme101/kernel_patches/releases/latest"
-          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
-          
-          if [ -n "$SUSFS_PATCH" ]; then
-            curl -L -o susfs.patch "$SUSFS_PATCH"
-            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
-          fi
-
-          # Apply syscall hooks
-          curl -L -o hooks.patch "https://raw.githubusercontent.com/yougotme101/kernel_patches/main/scope_min_manual_hooks_v1.6.patch"
-          patch -p1 < hooks.patch || echo "Warning: Syscall hooks failed"
-           
       - name: "👍 Make defconfig"
         run: |
           TC_DIR="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
