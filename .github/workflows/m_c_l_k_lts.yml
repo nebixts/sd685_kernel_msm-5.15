@@ -1,0 +1,94 @@
+name: Merge Latest CLO Kernel
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  merge-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout local repository
+        uses: actions/checkout@v4
+        with:
+          ref: codelinaro # Target your local 'codelinaro' branch
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Upstream Remote
+        run: |
+          # Links the upstream tracking directly to the Code Linaro Kernel Common Git Mirror
+          git remote add clo-stable https://git.codelinaro.org/clo/la/kernel/msm-5.15.git
+          git fetch clo-stable --tags --force
+
+      - name: Auto-Detect & Safe Merge
+        id: merge_step
+        run: |
+          # Strictly query the latest Android 13 5.15 LTS release tags hosted on CLO
+          LATEST_TAG=$(git tag -l "android13-5.15.*_r*" | sort -V | tail -n 1)
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          
+          if [ -z "$LATEST_TAG" ]; then
+             echo "❌ Error: No matching android13-5.15 tags found on Code Linaro mirror."
+             exit 1
+          fi
+
+          echo "Found target CLO Tag: $LATEST_TAG"
+
+          # Handle baseline stitching smoothly on the 'codelinaro' branch
+          if ! git merge-base codelinaro "$LATEST_TAG" > /dev/null; then
+             echo "⚠️ Warning: Unrelated histories. Stitching baseline history..."
+             git merge "$LATEST_TAG" --allow-unrelated-histories --no-edit
+          else
+             echo "Merging updates from $LATEST_TAG..."
+             git merge "$LATEST_TAG" --no-edit
+          fi
+
+      - name: Push Changes
+        run: git push origin codelinaro # Pushes directly back to your codelinaro target branch
+
+      - name: Close Conflict Issue on Success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              creator: 'github-actions[bot]'
+            });
+            
+            for (const issue of issues.data) {
+              if (issue.title.includes('Merge Conflict: Stable CLO Kernel')) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  body: '✅ Conflict resolved by successful automated CLO merge.'
+                });
+              }
+            }
+
+      - name: Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = "${{ steps.merge_step.outputs.tag }}";
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Merge Conflict: Stable CLO Kernel ${tag || 'Unknown Tag'}`,
+              body: `Automated merge of **${tag || 'android13-5.15 LTS'}** failed on your 'codelinaro' branch. Please resolve conflicts manually.`
+            })
