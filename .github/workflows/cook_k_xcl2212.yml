@@ -53,7 +53,7 @@ on:
           - "NEXT"
           - "NEXT2"
           - "KOWSU"
-          - "KSUN"
+          - "KSU-V"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -1163,17 +1163,17 @@ jobs:
           
           echo "✅ Installed KOWSU with SUSFS Successfully"
 
-      - name: "🔧 Setup KSUN "
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUN'
+      - name: "🔧 Setup KSU-V"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSU-V'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          echo "🧹 Cleaning old KSUN..."
+          echo "🧹 Cleaning old KSU-V..."
           rm -rf KernelSU-Next drivers/kernelsu
   
-          echo "📦 Installing KSUN..."
+          echo "📦 Installing KSU-V..."
           # The setup script usually clones into KernelSU-Next automatically
-          curl -LSs "https://raw.githubusercontent.com/nebixts/KSUN/dev/kernel/setup.sh" | bash -s dev
-          echo "✔ KSUN installed successfully"
+          curl -LSs "https://raw.githubusercontent.com/nebixts/KSU/main/kernel/setup.sh" | bash -s main
+          echo "✔ KSU-V installed successfully"
           
           # Add KSUN configs
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
@@ -1183,9 +1183,9 @@ jobs:
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
           EOF
-          echo "✔ KSUN configs added"
+          echo "✔ KSU-V configs added"
          
-          echo "✅ Installed KSUN Successfully"
+          echo "✅ Installed KSU-V Successfully"
 
       - name: "👍 Make defconfig"
         run: |
