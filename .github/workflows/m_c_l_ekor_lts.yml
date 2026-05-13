@@ -34,11 +34,11 @@ jobs:
       - name: Auto-Detect & Safe Merge
         id: merge_step
         run: |
-          # Added an asterisk (*) wildcard pattern to detect real evolutionary revision iterations
-          LATEST_TAG=$(git tag -l "kernel.lnx.5.15.r*-rel" | sort -V | tail -n 1)
+          # Query tags directly from fetched remote references instead of local listing
+          LATEST_TAG=$(git show-ref --tags | awk -F/ '{print $3}' | grep -E '^kernel\.lnx\.5\.15\.r[0-9]+-rel$' | sort -V | tail -n 1)
           
           if [ -z "$LATEST_TAG" ]; then
-             echo "❌ Error: No matching android13-5.15 tags found on Code Linaro mirror."
+             echo "❌ Error: No matching android13-5.15 tags found on fetched Code Linaro mirror."
              exit 1
           fi
 
@@ -53,6 +53,7 @@ jobs:
              echo "Merging updates from $LATEST_TAG..."
              git merge "$LATEST_TAG" --no-edit
           fi
+
 
       - name: Push Changes
         run: git push origin codelinaro # Pushes directly back to your codelinaro target branch
