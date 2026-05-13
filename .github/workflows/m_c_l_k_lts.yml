@@ -34,7 +34,7 @@ jobs:
         id: merge_step
         run: |
           # Strictly query the latest Android 13 5.15 LTS release tags hosted on CLO
-          LATEST_TAG=$(git tag -l "android13-5.15.*_r*" | sort -V | tail -n 1)
+          LATEST_TAG=$(git tag -l "kernel.lnx.5.15.r1-rel" | sort -V | tail -n 1)
           echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           
           if [ -z "$LATEST_TAG" ]; then
