@@ -34,30 +34,29 @@ jobs:
       - name: Auto-Detect & Safe Merge
         id: merge_step
         run: |
-          echo "Fetching target tag directly from CodeLinaro remote endpoint..."
+          echo "Scanning fetched remote tracking branches for latest release..."
           
-          # Directly pull and parse the tag map from CodeLinaro to avoid local tracking issues
-          LATEST_TAG=$(git ls-remote --tags clo-stable | awk -F'refs/tags/' '{print $2}' | grep -E '^kernel\.lnx\.5\.15\.r[0-9]+-rel$' | sort -V | tail -n 1)
+          # Query remote branches instead of tags based on the explicit Git mirror log output
+          LATEST_BRANCH=$(git branch -r | grep -E 'clo-stable/kernel\.lnx\.5\.15\.r[0-9]+-rel$' | sort -V | tail -n 1 | sed 's/^[[:space:]]*//')
           
-          if [ -z "$LATEST_TAG" ]; then
-             echo "❌ Error: No matching android13-5.15 tags found on fetched Code Linaro mirror."
+          if [ -z "$LATEST_BRANCH" ]; then
+             echo "❌ Error: No matching android13-5.15 release branches found on Code Linaro mirror."
              exit 1
           fi
 
-          echo "Found target CLO Tag: $LATEST_TAG"
-          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          # Extract only the branch name without the remote alias prefix for issue tracking
+          CLEAN_TAG_NAME=$(echo "$LATEST_BRANCH" | sed 's|clo-stable/||')
 
-          # Fetch ONLY the specific target tag to keep your runner workspace clean
-          echo "Fetching target tag object references..."
-          git fetch clo-stable refs/tags/$LATEST_TAG:refs/tags/$LATEST_TAG --force
+          echo "Found target CLO Release Branch: $LATEST_BRANCH"
+          echo "tag=$CLEAN_TAG_NAME" >> $GITHUB_OUTPUT
 
-          # Handle baseline stitching smoothly on the 'codelinaro' branch
-          if ! git merge-base codelinaro "$LATEST_TAG" > /dev/null; then
+          # Handle baseline stitching smoothly on the local 'codelinaro' branch using the remote branch reference
+          if ! git merge-base codelinaro "$LATEST_BRANCH" > /dev/null; then
              echo "⚠️ Warning: Unrelated histories. Stitching baseline history..."
-             git merge "$LATEST_TAG" --allow-unrelated-histories --no-edit
+             git merge "$LATEST_BRANCH" --allow-unrelated-histories --no-edit
           else
-             echo "Merging updates from $LATEST_TAG..."
-             git merge "$LATEST_TAG" --no-edit
+             echo "Merging updates from $LATEST_BRANCH..."
+             git merge "$LATEST_BRANCH" --no-edit
           fi
 
       - name: Push Changes
