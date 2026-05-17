@@ -1079,52 +1079,68 @@ jobs:
           rm -rf susfs4ksu
           echo "🎉 NEXT2 with SUSFS Integration complete!"
     
-      - name: "🔧 Setup RESUKISU with SUSFS"
+      - name: "🔧 Setup RESUKISU with SUSFS (android13-5.15)"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
+          # Establish local script anchor variable to safely manage nested path strings
+          KERNEL_ROOT=$(pwd)
+    
+          echo "🗑️ Cleaning old KernelSU drivers..."
           rm -rf ./KernelSU ./drivers/kernelsu
-          
+    
           echo "📦 Installing RESUKISU..."
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          
-          KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 30700)
+          curl -LSs "https://githubusercontent.com" | bash -s main
+    
+          # Enter local workspace folder safely to fetch tracking stats
+          cd ./KernelSU
+          KSU_VERSION=$(expr $(git rev-list --count HEAD) "+" 30700)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-      
-          echo "✔ RESUKISU installed successfully"
-          
-          cd kernel_workspace
+          echo "✔ RESUKISU installed successfully (Version: $KSU_VERSION)"
+    
+          # Return to anchor directory root
+          cd "$KERNEL_ROOT"
+          echo "⬇️ Cloning target 5.15 patch dependencies..."    
+          # Switch branch target parameters from android15-6.6 to matching android13-5.15
+          git clone https://gitlab.com -b oki-android13-5.15 --depth=1 || \
+          git clone https://gitlab.com -b master --depth=1
+    
+          git clone https://github.com --depth=1
+          git clone https://github.com --depth=1
 
-          echo "⬇️ Clone SUSFS..."    
-          git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android15-6.6
-       
-          git clone https://github.com/mrcxlinux/kernel_patches.git
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-
-          cd kernel_platform
-
-          echo "📝 复制补丁文件..."
-
+          cd "$KERNEL_ROOT"
+    
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cp ../susfs4oki/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
-            cp ../susfs4oki/kernel_patches/fs/* ./common/fs/
-            cp ../susfs4oki/kernel_patches/include/linux/* ./common/include/linux/
+            echo "📝 Applying SUSFS Patches for 5.15..."
+      
+          # Select either specific android13-5.15 GKI variant or fall back safely to universal patch
+          if [ -f "./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch" ]; then
+            SUSFS_PATCH="50_add_susfs_in_gki-android13-5.15.patch"
           else
-            cp ../kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./common/
+            SUSFS_PATCH=$(find ./susfs4oki/kernel_patches/ -name "*5.15*.patch" | head -n 1)
+            [ -z "$SUSFS_PATCH" ] && SUSFS_PATCH="50_add_susfs_in_kernel.patch"
           fi
-          
-          cd ./common
-          
-            echo "📦 应用SUSFS补丁..."
-            patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
-          
-            echo "📦 应用MANUAL_HOOK补丁..."
-            patch -p1 -F 3 < scope_min_manual_hooks_v1.9.patch
-          
-          echo "✅ 所有补丁应用完成"
-          
+      
+          echo "🎯 Selected patch file: $SUSFS_PATCH"
+          cp ./susfs4oki/kernel_patches/$SUSFS_PATCH ./
+          cp -r ./susfs4oki/kernel_patches/fs/* ./fs/ 2>/dev/null || cp -r ./susfs4oki/kernel_patches/fs/. ./fs/
+          cp -r ./susfs4oki/kernel_patches/include/linux/* ./include/linux/ 2>/dev/null || cp -r ./susfs4oki/kernel_patches/include/linux/. ./include/linux/
+      
+          patch -p1 < $(basename $SUSFS_PATCH) || echo "⚠️ SUSFS patch warning: minor conflicts ignored"
+          else
+          echo "📝 Applying Manual Hook Patches..."
+          cp ./kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./
+          patch -p1 -F 3 < scope_min_manual_hooks_v1.9.patch
+          fi
+    
+          echo "✅ All patches processed"
+    
+          cd "$KERNEL_ROOT"
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
+    
+          mkdir -p $(dirname "$CONFIG_FILE")
+    
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KPROBES=y
@@ -1148,13 +1164,14 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_SU=y
           CONFIG_KPM=y
           EOF
-          
+    
           echo "✔ RESUKISU configs with SUSFS added"
-          
-          rm -rf susfs4ksu
-          
+    
+          # Workspace cleaning
+          rm -rf ./susfs4oki ./kernel_patches ./SukiSU_patch
+    
           echo "✅ Installed RESUKISU with SUSFS Successfully"
-
+    
       - name: "🔧 Setup KSU-V"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSU-V'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -1179,20 +1196,19 @@ jobs:
          
           echo "✅ Installed KSU-V Successfully"
           
-     - name: 🧩 Patch Kernel Image (KPM) | KPM修补镜像
-        if: ${{ github.event.inputs.KPM == 'On' }}
+      - name: 🧩 Patch Kernel Image (KPM) | KPM修补镜像
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
+        working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
-          echo "🔧 正在应用KPM补丁..."
-          cd kernel_workspace/kernel_platform/out/Final-Image-Find
+          echo "🔧 Installing KPM..."
           curl -LO https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
           chmod +x patch_linux
           ./patch_linux
           
           rm -f Image
           mv oImage Image
-          cp Image $GITHUB_WORKSPACE/AnyKernel3/Image
-
-          echo "✅ KPM补丁应用完成"
+          
+          echo "✅ Install KPM Successfully"
           
       - name: "👍 Make defconfig"
         run: |
