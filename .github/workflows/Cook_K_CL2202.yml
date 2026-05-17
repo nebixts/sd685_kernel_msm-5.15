@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "kernelsu+susfs"
+        default: "next+susfs"
         options:
           - "kernelsu+susfs"
           - "wksu+susfs"
@@ -581,13 +581,10 @@ jobs:
 
           # 3. Patch KernelSU to accept SUSFS hooks
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          if [ -f "$KSU_PATCH" ]; then
-            cd KernelSU
-            patch -p1 < "../$KSU_PATCH" || echo "⚠️ KSU patch warning - continuing"
-            cd ..
-          fi
-          
+          cp "susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          cd KernelSU
+          patch -p1 < 10_enable_susfs_for_ksu.patch || true
+          rm -rf 10_enable_susfs_for_ksu.patch
           rm -rf susfs4ksu
 
           # 4. FIX UNDEFINED SYMBOLS (Inject Export macros directly)
