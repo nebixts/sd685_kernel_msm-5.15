@@ -581,10 +581,12 @@ jobs:
 
           # 3. Patch KernelSU to accept SUSFS hooks
           echo "🔧 Applying SUSFS -> KernelSU patch..."
-          cd KernelSU
-          cp "$susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" .    
-          patch -p1 < 10_enable_susfs_for_ksu.patch || true
-          rm -rf 10_enable_susfs_for_ksu.patch
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          if [ -f "$KSU_PATCH" ]; then
+            cd ../KernelSU
+            patch -p1 < "../$KSU_PATCH" || echo "⚠️ KSU patch warning - continuing"
+            cd ..
+          fi
           
           rm -rf susfs4ksu
 
