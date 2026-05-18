@@ -583,9 +583,7 @@ jobs:
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           if [ -f "$KSU_PATCH" ]; then
-            cd common/KernelSU
             patch -p1 < "../$KSU_PATCH" || echo "⚠️ KSU patch warning - continuing"
-            cd ..
           fi
           
           rm -rf susfs4ksu
