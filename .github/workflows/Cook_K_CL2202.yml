@@ -1,4 +1,4 @@
-name: "Cook_K_CL22"
+name: "Cook_K_CL2202"
 
 env:
   OUT_DIR: "out"
@@ -583,7 +583,7 @@ jobs:
           echo "🔧 Applying SUSFS -> KernelSU patch..."
           KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           if [ -f "$KSU_PATCH" ]; then
-            cd ../KernelSU
+            cd common/KernelSU
             patch -p1 < "../$KSU_PATCH" || echo "⚠️ KSU patch warning - continuing"
             cd ..
           fi
