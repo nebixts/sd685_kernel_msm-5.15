@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "next+susfs"
+        default: "wksu+susfs"
         options:
           - "kernelsu+susfs"
           - "wksu+susfs"
@@ -776,7 +776,7 @@ jobs:
           if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
             KSU_INFO="_${{ github.event.inputs.ksuVariant }}"
           fi
-          ZIP_NAME="nefarian_cl22c_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
+          ZIP_NAME="nefarian_cl2202_${{ github.event.inputs.kernelBranch }}${KSU_INFO}_${{ github.event.inputs.optimizationLevel }}_${{ github.event.inputs.tickRate }}hz_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
