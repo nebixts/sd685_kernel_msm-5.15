@@ -1102,7 +1102,7 @@ jobs:
           rm -rf ./KernelSU ./drivers/kernelsu
     
           echo "📦 Installing RESUKISU..."
-          curl -LSs "https://githubusercontent.com" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
           echo "✔ RESUKISU installed successfully (Version: $KSU_VERSION)"
     
           echo "⬇️ Cloning target 5.15 patch dependencies..."    
