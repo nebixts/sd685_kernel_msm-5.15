@@ -461,7 +461,6 @@ jobs:
         if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          cd common_gki/common
           
           echo "🛠️ Install KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s main
@@ -484,11 +483,10 @@ jobs:
         
           echo "✅ Installing KernelSU Successfully"
         
-      - name: "🔧 Setup Patches"
+      - name: "🔧 Setup SUSFS Patches"
         if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          cd common_gki
 
           echo "⬇️ 下载所需补丁..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
@@ -497,7 +495,6 @@ jobs:
           git clone https://github.com/mrcxlinux/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
 
-          cd common
           echo "📝 复制补丁文件..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
             cp ../susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
