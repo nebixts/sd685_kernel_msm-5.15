@@ -1091,28 +1091,14 @@ jobs:
     
           echo "📦 Installing RESUKISU..."
           curl -LSs "https://githubusercontent.com" | bash -s main
-    
-          # Enter local workspace folder safely to fetch tracking stats
-          cd ./KernelSU
-          KSU_VERSION=$(expr $(git rev-list --count HEAD) "+" 30700)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
           echo "✔ RESUKISU installed successfully (Version: $KSU_VERSION)"
     
-          # Return to anchor directory root
-          cd "$KERNEL_ROOT"
           echo "⬇️ Cloning target 5.15 patch dependencies..."    
           # Switch branch target parameters from android15-6.6 to matching android13-5.15
-          git clone https://gitlab.com -b oki-android13-5.15 --depth=1 || \
-          git clone https://gitlab.com -b master --depth=1
+          git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android13-5.15
+          git clone https://github.com/mrcxlinux/kernel_patches.git
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
     
-          git clone https://github.com --depth=1
-          git clone https://github.com --depth=1
-
-          cd "$KERNEL_ROOT"
-    
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            echo "📝 Applying SUSFS Patches for 5.15..."
-      
           # Select either specific android13-5.15 GKI variant or fall back safely to universal patch
           if [ -f "./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch" ]; then
             SUSFS_PATCH="50_add_susfs_in_gki-android13-5.15.patch"
@@ -1135,14 +1121,11 @@ jobs:
     
           echo "✅ All patches processed"
     
-          cd "$KERNEL_ROOT"
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           echo "📝 Configuring $CONFIG_FILE"
-    
-          mkdir -p $(dirname "$CONFIG_FILE")
-    
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
+          CONFIG_KPM=y
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
@@ -1162,7 +1145,6 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_KPM=y
           EOF
     
           echo "✔ RESUKISU configs with SUSFS added"
