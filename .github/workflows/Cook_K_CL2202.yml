@@ -477,9 +477,10 @@ jobs:
           for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
            if [ -f "$CONF" ]; then
              sed -i '/CONFIG_KSU/d' "$CONF"
-           cat >> "$CONF" << 'EOF'
-           CONFIG_KSU=y
-           EOF
+             cat >> "$CONF" << 'EOF'
+             CONFIG_KSU=y
+             EOF
+           fi
         
           echo "✅ Installing KernelSU Successfully"
         
@@ -560,6 +561,7 @@ jobs:
            CONFIG_KSU_SUSFS_SUS_MAP=y
            CONFIG_KSU_SUSFS_SUS_SU=y
            EOF
+           fi
           
            echo "✅ SUSFS Integration Successfully"
           
