@@ -473,14 +473,11 @@ jobs:
 
           sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
 
-          echo "📝 Applying Defconfig Settings..."
-          for CONF in "arch/arm64/configs/${{ env.DEFCONFIG_NAME }}" "arch/arm64/configs/gki_defconfig"; do
-           if [ -f "$CONF" ]; then
-             sed -i '/CONFIG_KSU/d' "$CONF"
-             cat >> "$CONF" << 'EOF'
-             CONFIG_KSU=y
-             EOF
-           fi
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          EOF
         
           echo "✅ Installing KernelSU Successfully"
         
@@ -543,7 +540,6 @@ jobs:
            if [ -f "$CONF" ]; then
              sed -i '/CONFIG_KSU/d' "$CONF"
            cat >> "$CONF" << 'EOF'
-           CONFIG_KSU=y
            CONFIG_KSU_SUSFS=y
            CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
            CONFIG_KSU_SUSFS_SUS_PATH=y
