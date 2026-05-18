@@ -904,6 +904,18 @@ jobs:
             echo "✔ Created drivers/kernelsu symlink"
           fi
 
+          # Fix KSU hooks
+          if [ -f "KernelSU/kernel/ksu.c" ]; then
+            echo -e "\nEXPORT_SYMBOL_GPL(ksu_is_init_rc_hook_enabled);\nEXPORT_SYMBOL_GPL(ksu_is_input_hook_enabled);" >> KernelSU/kernel/ksu.c
+          elif [ -f "KernelSU/kernel/kernel_mutator.c" ]; then
+            echo -e "\nEXPORT_SYMBOL_GPL(ksu_is_init_rc_hook_enabled);\nEXPORT_SYMBOL_GPL(ksu_is_input_hook_enabled);" >> KernelSU/kernel/kernel_mutator.c
+          fi
+
+          # Fix SUSFS hooks
+          if [ -f "fs/susfs.c" ]; then
+            echo -e "\nEXPORT_SYMBOL_GPL(ksu_selinux_hide_running);\nEXPORT_SYMBOL(fake_state);\nEXPORT_SYMBOL(susfs_run_sus_path_loop);" >> fs/susfs.c
+          fi
+
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
