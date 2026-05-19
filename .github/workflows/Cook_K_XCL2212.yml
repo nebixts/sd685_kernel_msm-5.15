@@ -1183,7 +1183,7 @@ jobs:
           fi
 
            echo "📝 Applying Defconfig Settings..."
-           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
+           CONFIG_FILE="common/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
            if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
            cat >> "$CONFIG_FILE" << 'EOF'
            CONFIG_KSU=y
@@ -1204,6 +1204,7 @@ jobs:
            CONFIG_KSU_SUSFS_SUS_MAP=y
            CONFIG_KSU_SUSFS_SUS_SU=y
            EOF
+           done
            fi
            
            echo "✅ KSU2 with SUSFS Integration Successfully"
