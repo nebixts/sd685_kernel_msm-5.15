@@ -46,13 +46,11 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "WKSU"
+        default: "KERNELSU"
         options:
-          - "KERNELSU"
-          - "WKSU"
           - "NEXT"
           - "RESUKISU"
-          - "KSU2"
+          - "KERNELSU"
       SUSFS:
         description: "SUSFS - Root Hiding Methods (if KSU Enabled)"
         required: true
@@ -739,221 +737,6 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
           
       # ====================== Begin Processing Root Kernel  base of KernelSU Stage ======================
-      - name: "🛠️ Setup KernelSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KERNELSU'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -e
-          # Cleanup previous attempts
-          rm -rf ./KernelSU ./drivers/kernelsu
-
-          echo "📦 Installing KernelSU..."
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
-
-          echo "📦 Cloning SUSFS4KSU..."
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-    
-          # Apply Core Kernel Patch (FS, MM, SELinux)
-          echo "🔧 Applying SUSFS core kernel patch..."
-          SUSFS_CORE_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          patch -p1 --forward < "$SUSFS_CORE_PATCH" || echo "⚠️ Core patch skipped"
-
-          # Copy SUSFS Header & Source files
-          echo "📂 Copying SUSFS source files..."
-          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/
-
-          # Manual Integration (Bypass the broken .patch file)
-          echo "🔧 Integrating SUSFS into KernelSU manually..."
-          # Copy integration headers if they exist
-          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* KernelSU/kernel/
-          fi
-
-          # Inject include into sucompat.c
-          if [ -f "KernelSU/kernel/sucompat.c" ]; then
-            sed -i '/#include "ksu.h"/a #include <linux/susfs.h>' KernelSU/kernel/sucompat.c
-            echo "✅ Injected susfs.h into sucompat.c"
-          fi
-
-          # Fix missing SUS_SU definitions in header
-          cat >> include/linux/susfs_def.h << 'EOF'
-          #ifndef SUS_SU_DISABLED
-          #define SUS_SU_DISABLED 0
-          #define SUS_SU_WITH_HOOKS 1
-          #define SUS_SU_WITHOUT_HOOKS 2
-          #endif
-          EOF
-
-          echo "🔧 Ensuring SUSFS is included in the build system..."
-          if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-y += susfs.o" >> fs/Makefile
-            echo "✅ Added susfs.o to fs/Makefile"
-          fi
-
-          # Create Symlink
-          if [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU/kernel drivers/kernelsu
-            echo "✔ Created drivers/kernelsu symlink"
-          fi
-
-          echo "🔗 Wiring KernelSU into the build system..."
-
-          # Ensure we are in the correct directory
-          DRIVER_MAKEFILE="drivers/Makefile"
-          DRIVER_KCONFIG="drivers/Kconfig"
-
-          # 1. Update Makefile
-          if ! grep -q "kernelsu" "$DRIVER_MAKEFILE"; then
-            echo "obj-\$(CONFIG_KSU) += kernelsu/" >> "$DRIVER_MAKEFILE"
-            echo "✅ Added KernelSU to drivers/Makefile"
-          fi
-
-          # 2. Update Kconfig
-          if ! grep -q "drivers/kernelsu/Kconfig" "$DRIVER_KCONFIG"; then
-          # Injects the source line before the last endmenu
-            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$DRIVER_KCONFIG"
-            echo "✅ Added KernelSU to drivers/Kconfig"
-          fi
-
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          sed -i '/CONFIG_KSU/d' "$CONFIG_FILE"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          EOF
-          
-          echo "✔ KERNELSU configs with SUSFS added"
-
-          rm -rf susfs4ksu
-          
-          echo "🎉 KERNELSU with SUSFS Setup Complete"
-  
-      - name: "🛠️ Setup Wild KSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'WKSU'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -e
-          rm -rf ./KernelSU ./drivers/kernelsu
-          
-          echo "📦 Installing Wild KSU..."
-
-          # Installing WildKSU
-          curl -LSs "https://raw.githubusercontent.com/nebixts/wksu/canary/kernel/setup.sh" | bash -s canary
-          # 2190b4a9e1203d282b87092c3452361dc7b1d2e4
-      
-          echo "✔ Wild KSU installed successfully"
-          
-          echo "📦 Cloning SUSFS4KSU for kernel patches..."
-          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-          
-          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          echo "🔧 Applying SUSFS kernel patch..."
-          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
-            echo "✅ SUSFS patch successfully applied"
-          else
-            echo "⚠️ SUSFS patch failed — copying files manually"
-          fi
-
-          echo "🔧 Applying SUSFS -> KernelSU patch..."
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          
-          echo "📄 Forcing SUSFS source injection..."
-          
-          mkdir -p fs
-          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-          echo "✔ Copied fs/susfs.c"
-          
-          mkdir -p include/linux
-          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-          echo "✔ Copied include/linux/susfs.h"
-          
-          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-            echo "✔ Copied include/linux/susfs_def.h"
-          else
-            echo "⚠️ susfs_def.h not found in repo"
-          fi
-          
-          echo "🔍 Verifying SUSFS files..."
-          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
-            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
-          done
-
-          # Register in fs/Makefile
-          if ! grep -q "susfs.o" fs/Makefile; then
-            echo "obj-y += susfs.o" >> fs/Makefile
-          fi
-          echo "✔ Applied Register fs/Makefile successfully"
-          
-          if [ ! -L "drivers/kernelsu" ]; then
-            ln -sf ../KernelSU drivers/kernelsu
-            echo "✔ Created drivers/kernelsu symlink"
-          fi
-
-          # Fix KSU hooks
-          if [ -f "KernelSU/kernel/ksu.c" ]; then
-            echo -e "\nEXPORT_SYMBOL_GPL(ksu_is_init_rc_hook_enabled);\nEXPORT_SYMBOL_GPL(ksu_is_input_hook_enabled);" >> KernelSU/kernel/ksu.c
-          elif [ -f "KernelSU/kernel/kernel_mutator.c" ]; then
-            echo -e "\nEXPORT_SYMBOL_GPL(ksu_is_init_rc_hook_enabled);\nEXPORT_SYMBOL_GPL(ksu_is_input_hook_enabled);" >> KernelSU/kernel/kernel_mutator.c
-          fi
-
-          # Fix SUSFS hooks
-          if [ -f "fs/susfs.c" ]; then
-            echo -e "\nEXPORT_SYMBOL_GPL(ksu_selinux_hide_running);\nEXPORT_SYMBOL(fake_state);\nEXPORT_SYMBOL(susfs_run_sus_path_loop);" >> fs/susfs.c
-          fi
-
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          EOF
-          
-          echo "✔ Wild KSU configs with SUSFS added"
-
-          rm -rf susfs4ksu
-          echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
 
       - name: "🛠️ Setup NEXT with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT'
@@ -1039,7 +822,7 @@ jobs:
           rm -rf susfs4ksu
           echo "🎉 NEXT with SUSFS Integration complete!"
 
-      - name: "🔧 Setup RESUKISU with SUSFS (android13-5.15)"
+      - name: "🔧 Setup RESUKISU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -1114,7 +897,7 @@ jobs:
     
           echo "✅ Installed RESUKISU with SUSFS Successfully"
     
-      - name: "⚡ Setup KSU2 with SUSFS2"
+      - name: "⚡ Setup KernelSU with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSU2'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -1210,7 +993,7 @@ jobs:
           exit 1
           fi
      
-          echo "✅ KSU2 with SUSFS Integration Successfully"
+          echo "✅ KernelSU with SUSFS Integration Successfully"
     
       - name: 🧩 Patch Kernel Image (KPM) | KPM修补镜像
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
