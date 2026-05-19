@@ -479,7 +479,7 @@ jobs:
           echo "⬇️ Download required patches..."
           cd "$BASE_DIR"
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android15-6.6
+            git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android13-5.15
           fi
           git clone https://github.com/mrcxlinux/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
