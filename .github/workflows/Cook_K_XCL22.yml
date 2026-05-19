@@ -1,4 +1,4 @@
-name: "Cook_K_XCL2212"
+name: "Cook_K_XCL22"
 
 env:
   OUT_DIR: "out"
@@ -48,9 +48,9 @@ on:
         type: choice
         default: "KERNELSU"
         options:
+          - "KERNELSU"
           - "NEXT"
           - "RESUKISU"
-          - "KERNELSU"
       SUSFS:
         description: "SUSFS - Root Hiding Methods (if KSU Enabled)"
         required: true
@@ -737,84 +737,9 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
           
       # ====================== Begin Processing Root Kernel  base of KernelSU Stage ======================
-
-      - name: "🔧 Setup RESUKISU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          # Establish local script anchor variable to safely manage nested path strings
-          KERNEL_ROOT=$(pwd)
-    
-          echo "🗑️ Cleaning old KernelSU drivers..."
-          rm -rf ./KernelSU ./drivers/kernelsu
-    
-          echo "📦 Installing RESUKISU..."
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          echo "✔ RESUKISU installed successfully (Version: $KSU_VERSION)"
-    
-          echo "⬇️ Cloning target 5.15 patch dependencies..."    
-          # Switch branch target parameters from android15-6.6 to matching android13-5.15
-          git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android13-5.15
-          git clone https://github.com/mrcxlinux/kernel_patches.git
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-    
-          # Select either specific android13-5.15 GKI variant or fall back safely to universal patch
-          if [ -f "./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch" ]; then
-            SUSFS_PATCH="50_add_susfs_in_gki-android13-5.15.patch"
-          else
-            SUSFS_PATCH=$(find ./susfs4oki/kernel_patches/ -name "*5.15*.patch" | head -n 1)
-            [ -z "$SUSFS_PATCH" ] && SUSFS_PATCH="50_add_susfs_in_kernel.patch"
-          fi
-      
-          echo "🎯 Selected patch file: $SUSFS_PATCH"
-          cp ./susfs4oki/kernel_patches/$SUSFS_PATCH ./
-          cp -r ./susfs4oki/kernel_patches/fs/* ./fs/ 2>/dev/null || cp -r ./susfs4oki/kernel_patches/fs/. ./fs/
-          cp -r ./susfs4oki/kernel_patches/include/linux/* ./include/linux/ 2>/dev/null || cp -r ./susfs4oki/kernel_patches/include/linux/. ./include/linux/
-      
-          patch -p1 < $(basename $SUSFS_PATCH) || echo "⚠️ SUSFS patch warning: minor conflicts ignored"
-          else
-          echo "📝 Applying Manual Hook Patches..."
-          cp ./kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./
-          patch -p1 -F 3 < scope_min_manual_hooks_v1.9.patch
-          fi
-    
-          echo "✅ All patches processed"
-    
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          echo "📝 Configuring $CONFIG_FILE"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPM=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          EOF
-    
-          echo "✔ RESUKISU configs with SUSFS added"
-    
-          # Workspace cleaning
-          rm -rf ./susfs4oki ./kernel_patches ./SukiSU_patch
-    
-          echo "✅ Installed RESUKISU with SUSFS Successfully"
     
       - name: "⚡ Setup KernelSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSU2'
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KERNELSU'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
@@ -886,6 +811,9 @@ jobs:
               cat >> "$CONFIG_FILE" << 'EOF'
 
           CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -912,7 +840,7 @@ jobs:
           echo "✅ KernelSU with SUSFS Integration Successfully"
     
       - name: "⚡ Setup KernelSU-NEXT with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUN'
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
@@ -992,6 +920,9 @@ jobs:
               cat >> "$CONFIG_FILE" << 'EOF'
 
           CONFIG_KSU=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
@@ -1017,6 +948,81 @@ jobs:
      
           echo "✅ KernelSU-NEXT with SUSFS Integration Successfully"
           
+      - name: "🔧 Setup RESUKISU with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          # Establish local script anchor variable to safely manage nested path strings
+          KERNEL_ROOT=$(pwd)
+    
+          echo "🗑️ Cleaning old KernelSU drivers..."
+          rm -rf ./KernelSU ./drivers/kernelsu
+    
+          echo "📦 Installing RESUKISU..."
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          echo "✔ RESUKISU installed successfully (Version: $KSU_VERSION)"
+    
+          echo "⬇️ Cloning target 5.15 patch dependencies..."    
+          # Switch branch target parameters from android15-6.6 to matching android13-5.15
+          git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android13-5.15
+          git clone https://github.com/mrcxlinux/kernel_patches.git
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+    
+          # Select either specific android13-5.15 GKI variant or fall back safely to universal patch
+          if [ -f "./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch" ]; then
+            SUSFS_PATCH="50_add_susfs_in_gki-android13-5.15.patch"
+          else
+            SUSFS_PATCH=$(find ./susfs4oki/kernel_patches/ -name "*5.15*.patch" | head -n 1)
+            [ -z "$SUSFS_PATCH" ] && SUSFS_PATCH="50_add_susfs_in_kernel.patch"
+          fi
+      
+          echo "🎯 Selected patch file: $SUSFS_PATCH"
+          cp ./susfs4oki/kernel_patches/$SUSFS_PATCH ./
+          cp -r ./susfs4oki/kernel_patches/fs/* ./fs/ 2>/dev/null || cp -r ./susfs4oki/kernel_patches/fs/. ./fs/
+          cp -r ./susfs4oki/kernel_patches/include/linux/* ./include/linux/ 2>/dev/null || cp -r ./susfs4oki/kernel_patches/include/linux/. ./include/linux/
+      
+          patch -p1 < $(basename $SUSFS_PATCH) || echo "⚠️ SUSFS patch warning: minor conflicts ignored"
+          else
+          echo "📝 Applying Manual Hook Patches..."
+          cp ./kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./
+          patch -p1 -F 3 < scope_min_manual_hooks_v1.9.patch
+          fi
+    
+          echo "✅ All patches processed"
+    
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "📝 Configuring $CONFIG_FILE"
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KPM=y
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KPROBE_EVENTS=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+    
+          echo "✔ RESUKISU configs with SUSFS added"
+    
+          # Workspace cleaning
+          rm -rf ./susfs4oki ./kernel_patches ./SukiSU_patch
+    
+          echo "✅ Installed RESUKISU with SUSFS Successfully"
+      
       - name: 🧩 Patch Kernel Image (KPM) | KPM修补镜像
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
         working-directory: ${{ env.WORK_DIR }}/out/dist
