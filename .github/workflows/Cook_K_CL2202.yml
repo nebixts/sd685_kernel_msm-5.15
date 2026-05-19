@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-19052026"
+        default: "-NeFaRiaN-3.5-G-20052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -456,104 +456,108 @@ jobs:
           wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
-        
-      - name: "⚡ Setup KernelSU"
-        if: matrix.variant == 'ksu'
+
+      - name: "⚡ Setup KernelSU with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSU2'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          
+          set -e
+          BASE_DIR=$(pwd)
+    
           echo "🛠️ Install KernelSU..."
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s main
 
-          cd KernelSU
+          # Use absolute path to avoid directory displacement
+          cd "$BASE_DIR/KernelSU"
 
           KSU_VERSION=$(expr $(curl -sI "https://api.github.com/repos/tiann/KernelSU/commits?sha=main&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p') "+" 30000)
-
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
           sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
-          
           echo "✅ Installing KernelSU Successfully"
-        
-      - name: "🔧 Setup SUSFS Patches"
-        if: matrix.variant == 'ksu'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
 
-          echo "⬇️ 下载所需补丁..."
+          echo "⬇️ Download required patches..."
+          cd "$BASE_DIR"
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
             git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android15-6.6
           fi
           git clone https://github.com/mrcxlinux/kernel_patches.git
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
-
-          echo "📝 复制补丁文件..."
+          echo "✅ Downloaded patches finish successfully"
+          
+          echo "📝 Copy patch file..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cp ../susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+            cp ./susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             PATCH_FILE="./KernelSU/10_enable_susfs_for_ksu.patch"
             if [ -f "$PATCH_FILE" ]; then
               if grep -q "a/kernel/Makefile" "$PATCH_FILE"; then
-                echo "🛠️ 检测到旧版 Makefile 补丁代码，正在执行修复..."
+                echo "🛠️ Old Makefile patch code detected, performing repair..."
                 sed -i 's|kernel/Makefile|kernel/Kbuild|g' "$PATCH_FILE"
                 sed -i 's|.*compdb.*|@@ -75,4 +75,13 @@ ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"|' "$PATCH_FILE"
                 sed -i 's|^ clean:| ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes|' "$PATCH_FILE"
                 sed -i 's|.*make -C.*| ccflags-y += -Wno-declaration-after-statement -Wno-unused-function|' "$PATCH_FILE"
-                echo "✅ 补丁修复完成！"
+                echo "✅ Patch repair complete!"
               else
-                echo "📝 补丁代码已修复至 Kbuild 或不匹配，跳过修改..."
+                echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
               fi
-            else
-              echo "❌ 未找到SUSFS补丁！"
-              exit 1
+              else
+              echo "❌ SUSFS patch not found!"
+            exit 1
             fi
-            cp ../susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
-            cp ../susfs4oki/kernel_patches/fs/* ./common/fs/
-            cp ../susfs4oki/kernel_patches/include/linux/* ./common/include/linux/
+            cp ./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
+            cp -r ./susfs4oki/kernel_patches/fs/* ./common/fs/ 2>/dev/null || cp ./susfs4oki/kernel_patches/fs/* ./common/fs/
+            cp -r ./susfs4oki/kernel_patches/include/linux/* ./common/include/linux/ 2>/dev/null || cp ./susfs4oki/kernel_patches/include/linux/* ./common/include/linux/
           fi
+          echo "✅ Copy patch file successfully"
 
-          echo "🔧 应用补丁..."
+          echo "🔧 Apply patch..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cd ./KernelSU
+            cd "$BASE_DIR/KernelSU"
             patch -p1 < 10_enable_susfs_for_ksu.patch || true
           fi
 
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cd ../common
-          elif [ "${{ github.event.inputs.SUSFS }}" == "Off" ]; then
-            cd ./common
-          fi
-
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then           
+            cd "$BASE_DIR/common"
             patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch || true
-            cp ../../kernel_patches/69_hide_stuff.patch ./
+            cp "$BASE_DIR/kernel_patches/69_hide_stuff.patch" ./
             patch -p1 -F 3 < 69_hide_stuff.patch
           fi
+          echo "✅ Patching successfully"
 
-           echo "📝 Applying Defconfig Settings..."
-           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}";
-           cat >> "$CONFIG_FILE" << 'EOF'
-           CONFIG_KSU=y
-           CONFIG_KSU_SUSFS=y
-           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-           CONFIG_KSU_SUSFS_SUS_PATH=y
-           CONFIG_KSU_SUSFS_SUS_MOUNT=y
-           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-           CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-           CONFIG_KSU_SUSFS_SUS_KSTAT=y
-           CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-           CONFIG_KSU_SUSFS_ENABLE_LOG=y
-           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-           CONFIG_KSU_SUSFS_SUS_MAP=y
-           CONFIG_KSU_SUSFS_SUS_SU=y
-           EOF
-           fi
-          
-           echo "✅ SUSFS Integration Successfully"
-          
+          echo "📝 Applying Defconfig Settings..."
+          cd "$BASE_DIR"
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+    
+          if [ -f "$CONFIG_FILE" ]; then
+            if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
+              cat >> "$CONFIG_FILE" << 'EOF'
+
+          CONFIG_KSU=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_SUSFS_SUS_SU=y
+          EOF
+            fi
+          else
+            echo "❌ Defconfig file not found at $CONFIG_FILE"
+          exit 1
+          fi
+     
+          echo "✅ KernelSU with SUSFS Integration Successfully"
+
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
