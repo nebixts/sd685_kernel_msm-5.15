@@ -868,6 +868,10 @@ jobs:
           echo "✅ Downloaded patches finish successfully"
           
           echo "📝 Copy patch file..."
+          # Force create the common directories so 'cp' doesn't fail
+          mkdir -p ./common/fs/
+          mkdir -p ./common/include/linux/
+          
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
             cp ./susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU-Next/
             PATCH_FILE="./KernelSU-Next/10_enable_susfs_for_ksu.patch"
@@ -882,9 +886,9 @@ jobs:
               else
                 echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
               fi
-              else
+            else
               echo "❌ SUSFS patch not found!"
-            exit 1
+              exit 1
             fi
             cp ./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
             cp -r ./susfs4oki/kernel_patches/fs/* ./common/fs/ 2>/dev/null || cp ./susfs4oki/kernel_patches/fs/* ./common/fs/
@@ -896,17 +900,29 @@ jobs:
 
           echo "🔧 Apply patch..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cd "$BASE_DIR/KernelSU"
+            # FIX 1: Point to KernelSU-Next directory, not KernelSU
+            cd "$BASE_DIR/KernelSU-Next"
             patch -p1 < 10_enable_susfs_for_ksu.patch || true
           fi
 
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then           
-            cd "$BASE_DIR/common"
+            # FIX 2: Check if common is inside kernel directory or at root
+            if [ -d "$BASE_DIR/common" ]; then
+              cd "$BASE_DIR/common"
+            else
+              cd "$BASE_DIR"
+            fi
             patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch || true
             cp "$BASE_DIR/kernel_patches/69_hide_stuff.patch" ./
             patch -p1 -F 3 < 69_hide_stuff.patch
           else
             echo "📦 Apply MANUAL_HOOK patch..."
+            # FIX 3: Ensure manual hook targets the correct root directory context
+            if [ -d "$BASE_DIR/common" ]; then
+              cd "$BASE_DIR/common"
+            else
+              cd "$BASE_DIR"
+            fi
             cp "$BASE_DIR/kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch" ./
             patch -p1 --fuzz=3 < scope_min_manual_hooks_v1.9.patch
           fi
