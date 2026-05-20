@@ -49,6 +49,7 @@ on:
         default: "KERNELSU"
         options:
           - "KERNELSU"
+          - "KSUN"
           - "NEXT"
       SUSFS:
         description: "SUSFS - Root Hiding Methods (if KSU Enabled)"
@@ -570,7 +571,7 @@ jobs:
           echo "✅ KernelSU with SUSFS Integration Successfully"
 
       - name: "⚡ Setup KernelSU-NEXT with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT'
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUN'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
@@ -677,6 +678,85 @@ jobs:
           fi
      
           echo "✅ KernelSU-NEXT with SUSFS Integration Successfully"
+
+      - name: "🛠️ Setup NEXT with SUSFS"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT'
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+           set -e
+           # Define internal path for diagnostics
+           KSU_NEXT_DIR="KernelSU-Next/kernel"
+
+           echo "🧹 Cleaning old KSU/NEXT..."
+           rm -rf KernelSU-Next drivers/kernelsu
+  
+           echo "📦 Installing NEXT..."
+           # The setup script usually clones into KernelSU-Next automatically
+           curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+           echo "✔ NEXT installed successfully"
+
+           #echo "📦 Enabling multimanager support..."
+           #curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/kernelsu-next_multimanager.patch" | patch -p1 --directory=KernelSU-Next
+  
+           echo "📦 Cloning SUSFS4KSU..."
+           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+
+           echo "📄 Forcing SUSFS source injection..."
+           mkdir -p fs include/linux
+           cp -f susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
+           cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+
+           echo "📦 Injecting SUSFS -> KernelSU-Next integration..."
+           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
+             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* $KSU_NEXT_DIR/
+             echo "✔ Copied SUSFS KernelSU integration files"
+           fi
+           
+           # Applying Patches (Execute from Kernel Root)
+           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+           echo "🔧 Applying SUSFS kernel patch..."
+           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+             echo "✅ SUSFS patch successfully applied"
+           else
+             echo "⚠️ SUSFS patch failed — common on non-GKI, files will be forced manually"
+           fi
+
+           echo "📦 Applying hide_stuff & manual_hooks..."
+           curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
+           curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/scope_min_manual_hooks_v1.9.patch" | patch -p1 --fuzz=3 || echo "⚠️ Manual hooks patch skipped"
+
+           # 5. Config injection
+           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+           echo "📝 Configuring $CONFIG_FILE"
+           # Use grep to check if KSU is already defined to avoid duplicates
+           if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
+           cat >> "$CONFIG_FILE" << 'EOF'
+           CONFIG_KSU=y
+           CONFIG_KPROBES=y
+           CONFIG_HAVE_KPROBES=y
+           CONFIG_KPROBE_EVENTS=y
+           CONFIG_KSU_SUSFS=y
+           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+           CONFIG_KSU_SUSFS_SUS_PATH=y
+           CONFIG_KSU_SUSFS_SUS_MOUNT=y
+           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+           CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+           CONFIG_KSU_SUSFS_SUS_KSTAT=y
+           CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+           CONFIG_KSU_SUSFS_ENABLE_LOG=y
+           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+           CONFIG_KSU_SUSFS_SUS_MAP=y
+           CONFIG_KSU_SUSFS_SUS_SU=y
+           EOF
+           fi
+
+           echo "🎉 NEXT with SUSFS Integration complete!"
 
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
