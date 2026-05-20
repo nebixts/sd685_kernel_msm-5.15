@@ -42,6 +42,13 @@ on:
           - "noksu"
           - "ksu"
           - "both"
+      ksuVariant:
+        description: "KSU implementation (if KSU enabled)"
+        required: true
+        type: choice
+        default: "KERNELSU"
+        options:
+          - "KERNELSU"
       SUSFS:
         description: "SUSFS - Root Hiding Methods (if KSU Enabled)"
         required: true
@@ -458,7 +465,7 @@ jobs:
           sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
       - name: "⚡ Setup KernelSU with SUSFS"
-        if: matrix.variant == 'ksu'
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KERNELSU'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
