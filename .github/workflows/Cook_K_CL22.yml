@@ -479,7 +479,7 @@ jobs:
           BASE_DIR=$(pwd)
     
           echo "🛠️ Install KernelSU..."
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/refs/heads/main/kernel/setup.sh" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/nebixts/KSU/refs/heads/main/kernel/setup.sh" | bash -s main
 
           # Use absolute path to avoid directory displacement
           cd "$BASE_DIR/KernelSU"
@@ -490,18 +490,16 @@ jobs:
           sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
           echo "✅ Installing KernelSU Successfully"
 
-          echo "⬇️ Download required patches..."
+          echo "⬇️ Clone SUSFS Patches..."
           cd "$BASE_DIR"
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android13-5.15
+            git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
           fi
-          git clone https://github.com/mrcxlinux/kernel_patches.git
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          echo "✅ Downloaded patches finish successfully"
+          echo "✅ Clone SUSFS Patches successfully"
           
           echo "📝 Copy patch file..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cp ./susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+            cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
             PATCH_FILE="./KernelSU/10_enable_susfs_for_ksu.patch"
             if [ -f "$PATCH_FILE" ]; then
               if grep -q "a/kernel/Makefile" "$PATCH_FILE"; then
@@ -518,9 +516,9 @@ jobs:
               echo "❌ SUSFS patch not found!"
             exit 1
             fi
-            cp ./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
-            cp -r ./susfs4oki/kernel_patches/fs/* ./common/fs/ 2>/dev/null || cp ./susfs4oki/kernel_patches/fs/* ./common/fs/
-            cp -r ./susfs4oki/kernel_patches/include/linux/* ./common/include/linux/ 2>/dev/null || cp ./susfs4oki/kernel_patches/include/linux/* ./common/include/linux/
+            cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
+            cp -r ./susfs4ksu/kernel_patches/fs/* ./common/fs/
+            cp -r ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
           fi
           echo "✅ Copy patch file successfully"
 
@@ -533,8 +531,7 @@ jobs:
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then           
             cd "$BASE_DIR/common"
             patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch || true
-            cp "$BASE_DIR/kernel_patches/69_hide_stuff.patch" ./
-            patch -p1 -F 3 < 69_hide_stuff.patch
+            patch -p1 -F 3 < https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch
           fi
           echo "✅ Patching successfully"
 
