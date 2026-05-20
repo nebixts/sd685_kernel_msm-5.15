@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-20052026"
+        default: "-NeFaRiaN-3.5-G-21052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -205,7 +205,7 @@ jobs:
           rm -rf .repo
           rm -rf common
                                                                                     
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r596125.tar.gz "https://github.com/nebixts/clang_L/releases/download/v2.0.0/clang-r596125.tar.gz"
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r596125.tar.gz "https://github.com/nebixts/clang_L/releases/download/v2.0.2/clang-r596125.tar.gz"
           mkdir -p prebuilts/clang/host/linux-x86/clang-r596125
           tar -xzf prebuilts/clang/host/linux-x86/clang-r596125.tar.gz -C prebuilts/clang/host/linux-x86/clang-r596125
           rm -rf prebuilts/clang/host/linux-x86/clang-r596125.tar.gz
