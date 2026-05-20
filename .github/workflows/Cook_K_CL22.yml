@@ -687,9 +687,6 @@ jobs:
            # Define internal path for diagnostics
            KSU_NEXT_DIR="KernelSU-Next/kernel"
 
-           echo "🧹 Cleaning old KSU/NEXT..."
-           rm -rf KernelSU-Next drivers/kernelsu
-  
            echo "📦 Installing NEXT..."
            # The setup script usually clones into KernelSU-Next automatically
            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
@@ -703,16 +700,9 @@ jobs:
 
            echo "📄 Forcing SUSFS source injection..."
            mkdir -p fs include/linux
-           cp -f susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
            cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
            cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
            [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
-
-           echo "📦 Injecting SUSFS -> KernelSU-Next integration..."
-           if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-             cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* $KSU_NEXT_DIR/
-             echo "✔ Copied SUSFS KernelSU integration files"
-           fi
            
            # Applying Patches (Execute from Kernel Root)
            SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
