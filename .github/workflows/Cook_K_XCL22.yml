@@ -869,8 +869,8 @@ jobs:
           
           echo "📝 Copy patch file..."
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cp ./susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
-            PATCH_FILE="./KernelSU/10_enable_susfs_for_ksu.patch"
+            cp ./susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU-Next/
+            PATCH_FILE="./KernelSU-Next/10_enable_susfs_for_ksu.patch"
             if [ -f "$PATCH_FILE" ]; then
               if grep -q "a/kernel/Makefile" "$PATCH_FILE"; then
                 echo "🛠️ Old Makefile patch code detected, performing repair..."
