@@ -899,15 +899,8 @@ jobs:
           echo "✅ Copy patch file successfully"
 
           echo "🔧 Apply patch..."
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cd "$BASE_DIR/KernelSU-Next"
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
-          fi
-
-          # Target the true kernel repository path specified by your environment variables
-          cd "$BASE_DIR/${{ env.kernelDir }}/${{ env.kernelName }}"
-
           if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then           
+            cd "$BASE_DIR/common"
             patch -p1 < "$BASE_DIR/susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch" || true
             cp "$BASE_DIR/kernel_patches/69_hide_stuff.patch" ./
             patch -p1 -F 3 < 69_hide_stuff.patch
