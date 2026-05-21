@@ -469,7 +469,7 @@ jobs:
         run: |
           set -e
           # Define internal path for diagnostics
-          KSU_NEXT_DIR="KernelSU"
+          KSU_NEXT_DIR="KernelSU/kernel"
 
           echo "📦 Installing KernelSU..."
           # The setup script usually clones into KernelSU-Next automatically
@@ -511,7 +511,7 @@ jobs:
           # Applying Patches (Execute from Kernel Root)
           KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           echo "🔧 Applying KSU KERNEL PATCH..."
-          cd "KSU_NEXT_DIR"
+          cd KernelSU
           if patch -p1 < "$KSU_KERNEL_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
@@ -530,7 +530,7 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
 
           echo "📝 Applying Defconfig Settings..."
-          cd "$KSU_NEXT_DIR"
+          #cd "$KSU_NEXT_DIR"
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           if [ -f "$CONFIG_FILE" ]; then
             if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
