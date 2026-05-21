@@ -488,30 +488,29 @@ jobs:
           cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
           [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
            
-          echo "📝 Copy patch file..."
-          #cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
-          KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          if [ -f "$KSU_KERNEL_PATCH" ]; then
-            if grep -q "a/kernel/Makefile" "$KSU_KERNEL_PATCH"; then
-              echo "🛠️ Old Makefile patch code detected, performing repair..."
-              sed -i 's|kernel/Makefile|kernel/Kbuild|g' "$KSU_KERNEL_PATCH"
-              sed -i 's|.*compdb.*|@@ -75,4 +75,13 @@ ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"|' "$KSU_KERNEL_PATCH"
-              sed -i 's|^ clean:| ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes|' "$KSU_KERNEL_PATCH"
-              sed -i 's|.*make -C.*| ccflags-y += -Wno-declaration-after-statement -Wno-unused-function|' "$KSU_KERNEL_PATCH"
-              echo "✅ Patch repair complete!"
-              else
-              echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
-            fi
-              else
-              echo "❌ SUSFS patch not found!"
-             exit 1
-          fi
-          echo "✅ Copy patch file successfully"
+          #echo "📝 Copy patch file..."
+          #KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          #if [ -f "$KSU_KERNEL_PATCH" ]; then
+            #if grep -q "a/kernel/Makefile" "$KSU_KERNEL_PATCH"; then
+              #echo "🛠️ Old Makefile patch code detected, performing repair..."
+              #sed -i 's|kernel/Makefile|kernel/Kbuild|g' "$KSU_KERNEL_PATCH"
+              #sed -i 's|.*compdb.*|@@ -75,4 +75,13 @@ ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"|' "$KSU_KERNEL_PATCH"
+              #sed -i 's|^ clean:| ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes|' "$KSU_KERNEL_PATCH"
+              #sed -i 's|.*make -C.*| ccflags-y += -Wno-declaration-after-statement -Wno-unused-function|' "$KSU_KERNEL_PATCH"
+              #echo "✅ Patch repair complete!"
+              #else
+              #echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
+            #fi
+              #else
+              #echo "❌ SUSFS patch not found!"
+             #exit 1
+          #fi
+          #echo "✅ Copy patch file successfully"
           
           # Applying Patches (Execute from Kernel Root)
           KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           echo "🔧 Applying KSU KERNEL PATCH..."
-          cd KernelSU
+          cd ./KernelSU
           if patch -p1 < "$KSU_KERNEL_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
