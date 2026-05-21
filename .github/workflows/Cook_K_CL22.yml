@@ -511,7 +511,7 @@ jobs:
           # Applying Patches (Execute from Kernel Root)
           KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           echo "🔧 Apply patch..."
-          cd "$KSU_NEXT_DIR"
+          cd ./KernelSU
           if patch -p1 < "$KSU_KERNEL_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
