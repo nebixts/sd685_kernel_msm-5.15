@@ -51,6 +51,14 @@ on:
           - "KERNELSU"
           - "NEXT"
           - "RESUKISU"
+      KPM:
+        description: "Kernel Patch Image for Sukisu/Resukisu (if KSU Enabled)"
+        required: true
+        type: choice
+        default: "off"
+        options:
+          - "on"
+          - "off"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -701,8 +709,8 @@ jobs:
 
       # ====================== Begin Packaging the Kernel Stage ======================
 
-      - name: "🧩 Patch Kernel Image (KPM) for RESUKISU"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
+      - name: "🧩 Patch Kernel Image (KPM) for SUKISU/RESUKISU"
+        if: matrix.variant == 'ksu' && github.event.inputs.KPM == 'on'
         working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
           echo "🔧 Downloading KPM tool..."
