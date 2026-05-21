@@ -1,4 +1,4 @@
-name: Merge Latest CLO Kernel
+name: Merge Latest CLO Kernel android13-5.15 LTS
 
 on:
   workflow_dispatch:
