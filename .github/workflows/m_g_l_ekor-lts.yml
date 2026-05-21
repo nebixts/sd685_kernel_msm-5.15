@@ -1,0 +1,142 @@
+name: Merge Latest Google Kernel
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  merge-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout local repository
+        uses: actions/checkout@v4
+        with:
+          ref: google
+          fetch-depth: 0 # Fetches full history for proper merge-base checks
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Upstream Remote
+        run: |
+          git remote add linux-stable https://android.googlesource.com/kernel/common
+          # Explicitly fetch tags from upstream matching the android13-5.15 pattern
+          git fetch linux-stable --tags --force
+
+      - name: Auto-Detect & Safe Merge
+        id: merge_step
+        run: |
+          # Matches android13-5.15.X_r00 LTS tags precisely
+          LATEST_TAG=$(git tag -l "android13-5.15.*_r*" | sort -V | tail -n 1)
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          
+          if [ -z "$LATEST_TAG" ]; then
+             echo "❌ Error: No matching android13-5.15 tags found in remote."
+             exit 1
+          fi
+
+          echo "Found latest target tag: $LATEST_TAG"
+
+          # Handle initial merge/unrelated histories cleanly
+          if ! git merge-base google "$LATEST_TAG" > /dev/null; then
+             echo "⚠️ Warning: Unrelated histories. Forcing initial baseline stitch..."
+             git merge "$LATEST_TAG" --allow-unrelated-histories --no-edit
+          else
+             echo "Merging updates from $LATEST_TAG..."
+             git merge "$LATEST_TAG" --no-edit
+          fi
+
+      - name: Push Changes
+        run: git push origin google
+
+      - name: Close Conflict Issue on Success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              creator: 'github-actions[bot]'
+            });
+            
+            for (const issue of issues.data) {
+              if (issue.title.includes('Merge Conflict: Stable Kernel')) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  body: '✅ Conflict resolved by successful automated merge.'
+                });
+              }
+            }
+
+      - name: Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = "${{ steps.merge_step.outputs.tag }}";
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Merge Conflict: Stable Kernel ${tag || 'Unknown Tag'}`,
+              body: `Automated merge of **${tag || 'android13-5.15 LTS'}** failed. Please resolve conflicts manually.`
+            })
+          
+            if ! git merge-base google "$LATEST_TAG" > /dev/null; then
+              echo "❌ Error: Unrelated histories."
+              exit 1
+            fi
+
+            echo "Merging $LATEST_TAG..."
+            git merge "$LATEST_TAG" --no-edit
+
+      - name: Push Changes
+        run: git push origin google
+
+      - name: Close Conflict Issue on Success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              creator: 'github-actions[bot]'
+            });
+            
+            for (const issue of issues.data) {
+              if (issue.title.includes('Merge Conflict: Stable Kernel')) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  body: '✅ Conflict resolved by successful automated merge.'
+                });
+              }
+            }
+
+      - name: Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = "${{ steps.merge_step.outputs.tag }}";
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Merge Conflict: Stable Kernel ${tag}`,
+              body: `Automated merge of **${tag}** failed. Please resolve manually.`
+            })
