@@ -46,19 +46,10 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "KERNELSU"
+        default: "NEXT"
         options:
           - "KERNELSU"
-          - "KSUN"
           - "NEXT"
-      SUSFS:
-        description: "SUSFS - Root Hiding Methods (if KSU Enabled)"
-        required: true
-        type: choice
-        default: "on"
-        options:
-          - "on"
-          - "off"
       optimizationLevel:
         description: "Compiler optimization level"
         required: false
@@ -477,179 +468,73 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          BASE_DIR=$(pwd)
-    
-          echo "🛠️ Install KernelSU..."
+          # Define internal path for diagnostics
+          KSU_NEXT_DIR="KernelSU/kernel"
+
+          echo "📦 Installing KernelSU..."
+          # The setup script usually clones into KernelSU-Next automatically
           curl -LSs "https://raw.githubusercontent.com/nebixts/KSU/refs/heads/main/kernel/setup.sh" | bash -s main
+          echo "✔ KernelSU installed successfully"
 
-          # Use absolute path to avoid directory displacement
-          cd "$BASE_DIR/KernelSU"
+          #echo "📦 Enabling multimanager support..."
+          #curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/kernelsu-next_multimanager.patch" | patch -p1 --directory=KernelSU-Next
+  
+          echo "📦 Cloning SUSFS4KSU..."
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
 
-          KSU_VERSION=$(expr $(curl -sI "https://api.github.com/repos/tiann/KernelSU/commits?sha=main&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p') "+" 30000)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-
-          sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
-          echo "✅ Installing KernelSU Successfully"
-
-          echo "⬇️ Clone SUSFS Patches..."
-          cd "$BASE_DIR"
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-          fi
-          echo "✅ Clone SUSFS Patches successfully"
-          
+          echo "📄 Forcing SUSFS source injection..."
+          mkdir -p fs include/linux
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+           
           echo "📝 Copy patch file..."
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
-            PATCH_FILE="./KernelSU/10_enable_susfs_for_ksu.patch"
-            if [ -f "$PATCH_FILE" ]; then
-              if grep -q "a/kernel/Makefile" "$PATCH_FILE"; then
-                echo "🛠️ Old Makefile patch code detected, performing repair..."
-                sed -i 's|kernel/Makefile|kernel/Kbuild|g' "$PATCH_FILE"
-                sed -i 's|.*compdb.*|@@ -75,4 +75,13 @@ ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"|' "$PATCH_FILE"
-                sed -i 's|^ clean:| ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes|' "$PATCH_FILE"
-                sed -i 's|.*make -C.*| ccflags-y += -Wno-declaration-after-statement -Wno-unused-function|' "$PATCH_FILE"
-                echo "✅ Patch repair complete!"
+          #cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+          KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+          if [ -f "$KSU_KERNEL_PATCH" ]; then
+            if grep -q "a/kernel/Makefile" "$KSU_KERNEL_PATCH"; then
+              echo "🛠️ Old Makefile patch code detected, performing repair..."
+              sed -i 's|kernel/Makefile|kernel/Kbuild|g' "$KSU_KERNEL_PATCH"
+              sed -i 's|.*compdb.*|@@ -75,4 +75,13 @@ ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"|' "$KSU_KERNEL_PATCH"
+              sed -i 's|^ clean:| ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes|' "$KSU_KERNEL_PATCH"
+              sed -i 's|.*make -C.*| ccflags-y += -Wno-declaration-after-statement -Wno-unused-function|' "$KSU_KERNEL_PATCH"
+              echo "✅ Patch repair complete!"
               else
-                echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
-              fi
+              echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
+            fi
               else
               echo "❌ SUSFS patch not found!"
-            exit 1
-            fi
-            cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
-            cp -r ./susfs4ksu/kernel_patches/fs/* ./common/fs/
-            cp -r ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+             exit 1
           fi
           echo "✅ Copy patch file successfully"
-
+          
+          # Applying Patches (Execute from Kernel Root)
+          KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           echo "🔧 Apply patch..."
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cd "$BASE_DIR/KernelSU"
-            patch -p1 < 10_enable_susfs_for_ksu.patch || true
+          cd "$KSU_NEXT_DIR/KernelSU"
+          if patch -p1 < "$KSU_KERNEL_PATCH"; then
+            echo "✅ KSU patch successfully applied"
+          else
+            echo "⚠️ KSU patch failed — common on non-GKI, files will be forced manually"
+          fi
+          
+          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          echo "🔧 Applying SUSFS kernel patch..."
+          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+            echo "✅ SUSFS patch successfully applied"
+          else
+            echo "⚠️ SUSFS patch failed — common on non-GKI, files will be forced manually"
           fi
 
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then           
-            cd "$BASE_DIR/common"
-            patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch || true
-            patch -p1 -F 3 < https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch
-          fi
-          echo "✅ Patching successfully"
+          echo "📦 Applying hide_stuff & manual_hooks..."
+          curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
 
-          echo "📝 Applying Defconfig Settings..."
-          cd "$BASE_DIR"
+          # Config injection
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-    
-          if [ -f "$CONFIG_FILE" ]; then
-            if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
-              cat >> "$CONFIG_FILE" << 'EOF'
-
-          CONFIG_KSU=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          EOF
-            fi
-          else
-            echo "❌ Defconfig file not found at $CONFIG_FILE"
-          exit 1
-          fi
-     
-          echo "✅ KernelSU with SUSFS Integration Successfully"
-
-      - name: "⚡ Setup KernelSU-NEXT with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'KSUN'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -e
-          BASE_DIR=$(pwd)
-    
-          echo "🛠️ Install KernelSU-NEXT..."
-          curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
-
-          # Use absolute path to avoid directory displacement
-          cd "$BASE_DIR/KernelSU-Next"
-
-          KSU_VERSION=$(expr $(curl -sI "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/commits?sha=dev&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p') "+" 30000)
-          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-          
-          sed -i "s/DKSU_VERSION=11998/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
-          echo "✅ Installing KernelSU-NEXT Successfully"
-
-          echo "⬇️ Download required patches..."
-          cd "$BASE_DIR"
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            git clone https://gitlab.com/cctv18/susfs4oki.git -b oki-android13-5.15
-          fi
-          git clone https://github.com/Xiaomichael/kernel_patches.git
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          echo "✅ Downloaded patches finish successfully"
-          
-          echo "📝 Copy patch file..."
-          # Force create the common directories so 'cp' doesn't fail
-          mkdir -p ./common/fs/
-          mkdir -p ./common/include/linux/
-          
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then
-            cp ./susfs4oki/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU-Next/
-            PATCH_FILE="./KernelSU-Next/10_enable_susfs_for_ksu.patch"
-            if [ -f "$PATCH_FILE" ]; then
-              if grep -q "a/kernel/Makefile" "$PATCH_FILE"; then
-                echo "🛠️ Old Makefile patch code detected, performing repair..."
-                sed -i 's|kernel/Makefile|kernel/Kbuild|g' "$PATCH_FILE"
-                sed -i 's|.*compdb.*|@@ -75,4 +75,13 @@ ccflags-y += -DEXPECTED_HASH=\\"$(KSU_EXPECTED_HASH)\\"|' "$PATCH_FILE"
-                sed -i 's|^ clean:| ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes|' "$PATCH_FILE"
-                sed -i 's|.*make -C.*| ccflags-y += -Wno-declaration-after-statement -Wno-unused-function|' "$PATCH_FILE"
-                echo "✅ Patch repair complete!"
-              else
-                echo "📝 Patch code already fixed to Kbuild or incompatible, skipping modifications..."
-              fi
-            else
-              echo "❌ SUSFS patch not found!"
-              exit 1
-            fi
-            cp ./susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./common/
-            cp -r ./susfs4oki/kernel_patches/fs/* ./common/fs/ 2>/dev/null || cp ./susfs4oki/kernel_patches/fs/* ./common/fs/
-            cp -r ./susfs4oki/kernel_patches/include/linux/* ./common/include/linux/ 2>/dev/null || cp ./susfs4oki/kernel_patches/include/linux/* ./common/include/linux/
-          else
-            cp -r ./kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch ./common/
-          fi
-          echo "✅ Copy patch file successfully"
-
-          echo "🔧 Apply patch..."
-          if [ "${{ github.event.inputs.SUSFS }}" == "On" ]; then           
-            cd "$BASE_DIR/common"
-            patch -p1 < "$BASE_DIR/susfs4oki/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch" || true
-            cp "$BASE_DIR/kernel_patches/69_hide_stuff.patch" ./
-            patch -p1 -F 3 < 69_hide_stuff.patch
-          else
-            echo "📦 Apply MANUAL_HOOK patch..."
-            cp "$BASE_DIR/kernel_patches/sukisu/scope_min_manual_hooks_v1.9.patch" ./
-            patch -p1 --fuzz=3 < scope_min_manual_hooks_v1.9.patch
-          fi
-          echo "✅ Patching successfully"
-
-          echo "📝 Applying Defconfig Settings..."
-          cd "$BASE_DIR"
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-    
-          if [ -f "$CONFIG_FILE" ]; then
-            if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
-              cat >> "$CONFIG_FILE" << 'EOF'
-
+          echo "📝 Configuring $CONFIG_FILE"
+          # Use grep to check if KSU is already defined to avoid duplicates
+          if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
+          cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
@@ -671,13 +556,9 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
-            fi
-          else
-            echo "❌ Defconfig file not found at $CONFIG_FILE"
-          exit 1
           fi
      
-          echo "✅ KernelSU-NEXT with SUSFS Integration Successfully"
+          echo "✅ KernelSU with SUSFS Integration Successfully"
 
       - name: "🛠️ Setup NEXT with SUSFS"
         if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'NEXT'
