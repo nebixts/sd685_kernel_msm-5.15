@@ -469,7 +469,7 @@ jobs:
         run: |
           set -e
           # Define internal path for diagnostics
-          KSU_NEXT_DIR="KernelSU/kernel"
+          KSU_NEXT_DIR="KernelSU"
 
           echo "📦 Installing KernelSU..."
           # The setup script usually clones into KernelSU-Next automatically
@@ -510,8 +510,8 @@ jobs:
           
           # Applying Patches (Execute from Kernel Root)
           KSU_KERNEL_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          echo "🔧 Apply patch..."
-          cd ./KernelSU
+          echo "🔧 Applying KSU KERNEL PATCH..."
+          cd "KSU_NEXT_DIR"
           if patch -p1 < "$KSU_KERNEL_PATCH"; then
             echo "✅ KSU patch successfully applied"
           else
@@ -519,22 +519,22 @@ jobs:
           fi
           
           SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          echo "🔧 Applying SUSFS kernel patch..."
+          echo "🔧 Applying SUSFS KERNEL PATCH..."
           if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
             echo "✅ SUSFS patch successfully applied"
           else
             echo "⚠️ SUSFS patch failed — common on non-GKI, files will be forced manually"
           fi
 
-          echo "📦 Applying hide_stuff & manual_hooks..."
+          echo "📦 Applying hide_stuff patch"
           curl -LSs "https://raw.githubusercontent.com/nebixts/kernel_patches/main/69_hide_stuff.patch" | patch -p1 -F 3 || echo "⚠️ Hide stuff patch skipped"
 
-          # Config injection
+          echo "📝 Applying Defconfig Settings..."
+          cd "$KSU_NEXT_DIR"
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          echo "📝 Configuring $CONFIG_FILE"
-          # Use grep to check if KSU is already defined to avoid duplicates
-          if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
-          cat >> "$CONFIG_FILE" << 'EOF'
+          if [ -f "$CONFIG_FILE" ]; then
+            if ! grep -q "CONFIG_KSU=y" "$CONFIG_FILE"; then
+              cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
@@ -556,6 +556,10 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
+            fi
+          else
+            echo "❌ Defconfig file not found at $CONFIG_FILE"
+          exit 1
           fi
      
           echo "✅ KernelSU with SUSFS Integration Successfully"
