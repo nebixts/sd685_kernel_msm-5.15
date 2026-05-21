@@ -678,20 +678,6 @@ jobs:
           rm -rf ./susfs4oki ./kernel_patches ./SukiSU_patch
     
           echo "✅ Installed RESUKISU with SUSFS Successfully"
-      
-      - name: "🧩 Patch Kernel Image (KPM) for RESUKISU"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
-        working-directory: ${{ env.WORK_DIR }}/out/dist
-        run: |
-          echo "🔧 Installing KPM..."
-          curl -LO https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
-          chmod +x patch_linux
-          ./patch_linux
-          
-          rm -f Image
-          mv oImage Image
-          
-          echo "✅ Install KPM Successfully"
 
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -714,6 +700,28 @@ jobs:
           fi
 
       # ====================== Begin Packaging the Kernel Stage ======================
+
+      - name: "🧩 Patch Kernel Image (KPM) for RESUKISU"
+        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'RESUKISU'
+        working-directory: ${{ env.WORK_DIR }}/out/dist
+        run: |
+          echo "🔧 Downloading KPM tool..."
+          curl -fLO https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
+          chmod +x patch_linux
+          
+          echo "🔧 Patching Kernel..."
+          # Note: Ensure patch_linux doesn't require flags like '-i Image'
+          ./patch_linux 
+          
+          if [ -f oImage ]; then
+            rm -f Image
+            mv oImage Image
+            cp Image "$GITHUB_WORKSPACE/AnyKernel3/Image"
+            echo "✅ KPM Patch Applied Successfully"
+          else
+            echo "❌ Error: oImage was not created by the patch tool!"
+            exit 1
+          fi
 
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
