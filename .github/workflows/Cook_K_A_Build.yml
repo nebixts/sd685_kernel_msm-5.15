@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-22052026"
+        default: "-NeFaRiaN-3.5-G-23052026"
       Toolchain:
         description: "Choose Toolchain Compiler"
         required: false
@@ -65,14 +65,6 @@ on:
         required: true
         type: choice
         default: "off"
-        options:
-          - "on"
-          - "off"
-      SUSFS:
-        description: "SUSFS - Root Hiding Methods (if KSU Enabled)"
-        required: true
-        type: choice
-        default: "on"
         options:
           - "on"
           - "off"
