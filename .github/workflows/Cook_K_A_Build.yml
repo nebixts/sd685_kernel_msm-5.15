@@ -446,9 +446,29 @@ jobs:
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             
             args="$args KCFLAGS='-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine'"
+            args="$args KCFLAGS='-O3 -flto=thin' KAFLAGS='-flto=thin' KBUILD_LDFLAGS='-flto=thin'"
             
             echo "args=$args" >> $GITHUB_OUTPUT
 
+      - name: "😎 Set args for GKI kernels"
+        if: github.event.inputs.Toolchain == 'LLVM'
+        id: generate-args
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+            args="-j$(nproc --all)"
+            if [ -n "${{ env.OUT_DIR }}" ]; then
+              mkdir -p $(pwd)/${{ env.OUT_DIR }}
+              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+            fi
+            
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+            
+            args="$args KCFLAGS='-O3 -flto=thin' KAFLAGS='-flto=thin' KBUILD_LDFLAGS='-flto=thin'"
+            
+            echo "args=$args" >> $GITHUB_OUTPUT
+      
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -1084,6 +1104,18 @@ jobs:
           cd ${{ env.kernelDir }}/${{ env.kernelName }}
           make ${{ steps.generate-args.outputs.args }} ${{ env.DEFCONFIG_NAME }}
 
+      - name: "👍 Make defconfig"
+        if: github.event.inputs.Toolchain == 'LLVM'
+        run: |
+          TC_DIR="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/clang"
+          
+          export PATH="$TC_DIR/bin:$PATH"
+          export LD_LIBRARY_PATH="$TC_DIR/lib:$LD_LIBRARY_PATH"
+          
+          cd ${{ env.kernelDir }}/${{ env.kernelName }}
+          make ${{ steps.generate-args.outputs.args }} ${{ env.DEFCONFIG_NAME }}
+          
+      
       # ====================== Begin Processing Build Kernel Stage ======================
     
       - name: "🔨 START Build Kernel"
@@ -1125,6 +1157,47 @@ jobs:
                CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
                KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine"
 
+      - name: "🛠️ Start Build Kernel 🪛"
+        if: github.event.inputs.Toolchain == 'LLVM'
+        run: |
+          set -e
+    
+          # 1. Restore Path from Env (using the path set in previous step)
+          # Note: $CLANG_PATH is already in $GITHUB_ENV, so we just ensure it's in $PATH
+          export PATH="${{ env.CLANG_PATH }}:$PATH"
+    
+          # 2. Enter Kernel Directory
+          cd common_gki/common
+
+          echo "🚀 Starting configuration for GKI..."
+    
+          # 3. Configure Kernel (Defconfig)
+          make -j$(nproc --all) \
+               O=out \
+               ARCH=arm64 \
+               LLVM=1 \
+               LLVM_IAS=1 \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+               #KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine" \
+               gki_defconfig
+
+               echo "🔨 Starting compilation..."
+
+           # 4. Build Kernel (Added 'Image' target)
+           make -j$(nproc --all) \
+                O=out \
+                ARCH=arm64 \
+                LLVM=1 \
+                LLVM_IAS=1 \
+                CROSS_COMPILE=aarch64-linux-gnu- \
+                CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+                #KCFLAGS="-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine" \
+                Image
+    
+            # Optional: Build modules or dtbo if needed
+            # make -j$(nproc --all) O=out LLVM=1 ... modules dtbo.img
+        
       - name: "🧩 Patch Kernel Image (KPM) for SUKISU/RESUKISU"
         if: matrix.variant == 'ksu' && github.event.inputs.KPM == 'on'
         working-directory: ${{ env.WORK_DIR }}/out/dist
