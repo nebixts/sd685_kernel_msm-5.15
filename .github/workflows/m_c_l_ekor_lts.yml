@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write
-  issues: write
+  pull-requests: write
 
 jobs:
   merge-kernel:
@@ -16,9 +16,8 @@ jobs:
       - name: Checkout local repository
         uses: actions/checkout@v4
         with:
-          ref: codelinaro # Target your local 'codelinaro' branch
+          ref: codelinaro 
           fetch-depth: 0
-          fetch-tags: true # Crucial to pull local repository tag metadata structures
 
       - name: Configure Git
         run: |
@@ -27,8 +26,7 @@ jobs:
 
       - name: Add Upstream Remote
         run: |
-          # Links the upstream tracking directly to the Code Linaro Kernel Common Git Mirror
-          git remote add clo-stable https://git.codelinaro.org/clo/la/kernel/msm-5.15.git
+          git remote add clo-stable https://codelinaro.org
           git fetch clo-stable --tags --force
 
       - name: Auto-Detect & Safe Merge
@@ -36,22 +34,19 @@ jobs:
         run: |
           echo "Scanning fetched remote tracking branches for latest release..."
           
-          # Query remote branches instead of tags based on the explicit Git mirror log output
-          LATEST_BRANCH=$(git branch -r | grep -E 'clo-stable/kernel\.lnx\.5\.15\.r[0-9]+-rel$' | sort -V | tail -n 1 | sed 's/^[[:space:]]*//')
+          LATEST_BRANCH=$(git branch -r | grep -E 'clo-stable/.*kernel\.lnx\.5\.15\.r[0-9]+-rel' | sort -V | tail -n 1 | sed 's/^[[:space:]]*//')
           
           if [ -z "$LATEST_BRANCH" ]; then
-             echo "❌ Error: No matching android13-5.15 release branches found on Code Linaro mirror."
+             echo "❌ Error: No matching 5.15 release branches found on Code Linaro mirror."
              exit 1
           fi
 
-          # Extract only the branch name without the remote alias prefix for issue tracking
           CLEAN_TAG_NAME=$(echo "$LATEST_BRANCH" | sed 's|clo-stable/||')
-
           echo "Found target CLO Release Branch: $LATEST_BRANCH"
           echo "tag=$CLEAN_TAG_NAME" >> $GITHUB_OUTPUT
 
-          # Handle baseline stitching smoothly on the local 'codelinaro' branch using the remote branch reference
-          if ! git merge-base codelinaro "$LATEST_BRANCH" > /dev/null; then
+          # Attempt standard merge
+          if ! git merge-base HEAD "$LATEST_BRANCH" > /dev/null; then
              echo "⚠️ Warning: Unrelated histories. Stitching baseline history..."
              git merge "$LATEST_BRANCH" --allow-unrelated-histories --no-edit
           else
@@ -59,42 +54,54 @@ jobs:
              git merge "$LATEST_BRANCH" --no-edit
           fi
 
-      - name: Push Changes
-        run: git push origin codelinaro # Pushes directly back to your codelinaro target branch
-
-      - name: Close Conflict Issue on Success
+      - name: Push Direct Changes
         if: success()
+        run: git push origin HEAD:codelinaro 
+
+      - name: Handle Merge Conflict via Pull Request
+        if: failure() && steps.merge_step.outputs.tag != ''
         uses: actions/github-script@v7
         with:
           script: |
-            const issues = await github.rest.issues.listForRepo({
+            const tag = '${{ steps.merge_step.outputs.tag }}';
+            const conflictBranch = `conflict-${tag}`;
+            
+            // 1. Abort the messy local merge and isolate conflict into a tracking branch
+            core.info('Isolating merge failure context into dedicated reference branch...');
+            await exec.exec('git', ['merge', '--abort']);
+            await exec.exec('git', ['checkout', '-b', conflictBranch]);
+            
+            // 2. Force an environment merge to preserve the conflict states inside the repo index markers
+            try {
+              await exec.exec('git', ['merge', `clo-stable/${tag}`, '--no-edit']);
+            } catch (err) {
+              core.info('Conflict files generated successfully.');
+            }
+            
+            // 3. Stage and push the conflict tracking branch markers up to GitHub
+            await exec.exec('git', ['add', '.']);
+            await exec.exec('git', ['-c', 'user.name="github-actions[bot]"', '-c', 'user.email="github-actions[bot]@users.noreply.github.com"', 'commit', '-m', `Expose conflicts for upstream ${tag}`]);
+            await exec.exec('git', ['push', 'origin', `HEAD:${conflictBranch}`, '--force']);
+            
+            // 4. Verify if a Pull Request is already active for this tag sequence
+            const prs = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              creator: 'github-actions[bot]'
+              head: `${context.repo.owner}:${conflictBranch}`
             });
             
-            for (const issue of issues.data) {
-              if (issue.title.includes('Merge Conflict: Stable CLO Kernel')) {
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  state: 'closed',
-                  body: '✅ Conflict resolved by successful automated CLO merge.'
-                });
-              }
+            if (prs.data.length === 0) {
+              core.info('Creating resolution Pull Request marker...');
+              await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Merge Conflict: Upstream CLO ${tag}`,
+                head: conflictBranch,
+                base: 'codelinaro',
+                body: `Automated integration of upstream updates from branch **${tag}** tracking failed with conflicts.\n\nPlease resolve conflict blocks manually directly inside this Pull Request.`
+              });
+            } else {
+              core.info('Pull request already exists. Target updated.');
             }
-
-      - name: Create Issue on Failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = `${{ steps.merge_step.outputs.tag }}`;
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Merge Conflict: Stable CLO Kernel ${tag || 'Unknown Tag'}`,
-              body: `Automated merge of **${tag || 'android13-5.15 LTS'}** failed on your 'codelinaro' branch. Please resolve conflicts manually.`
-            })
+            
