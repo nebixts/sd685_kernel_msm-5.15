@@ -230,8 +230,8 @@ jobs:
       # ====================== Source Code Preparation Stage ======================
     
       - name: "⚙️ Initialize Toolchains Repo"
-         run: |
-            set -e
+        run: |
+           set -e
 
            CLANG_VERSION="22.1.6"
            CLANG_URL="https://github.com{CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-24.04.tar.xz"
