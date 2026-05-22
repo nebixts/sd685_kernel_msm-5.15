@@ -22,9 +22,10 @@ static int dwxgmac2_get_tx_status(void *data, struct stmmac_extra_stats *x,
 	return ret;
 }
 
-static int dwxgmac2_get_rx_status(void *data, struct stmmac_extra_stats *x,
-				  struct dma_desc *p)
+static int dwxgmac2_get_rx_status_err(void *data, struct stmmac_extra_stats *x,
+				      struct dma_desc *p, int *status)
 {
+	struct net_device_stats *stats = (struct net_device_stats *)data;
 	unsigned int rdes3 = le32_to_cpu(p->des3);
 
 	if (unlikely(rdes3 & XGMAC_RDES3_OWN))
@@ -33,10 +34,45 @@ static int dwxgmac2_get_rx_status(void *data, struct stmmac_extra_stats *x,
 		return discard_frame;
 	if (likely(!(rdes3 & XGMAC_RDES3_LD)))
 		return rx_not_ls;
-	if (unlikely((rdes3 & XGMAC_RDES3_ES) && (rdes3 & XGMAC_RDES3_LD)))
+	if (unlikely((rdes3 & XGMAC_RDES3_ES) && (rdes3 & XGMAC_RDES3_LD))) {
+		if (unlikely(((rdes3 & XGMAC_RDES3_ET) >> 16) == XGMAC_RDES3_WDT)) {
+			x->rx_watchdog++;
+			*status = WDT_ERR;
+		}
+
+		if (unlikely(((rdes3 & XGMAC_RDES3_ET) >> 16) == XGMAC_RDES3_OVERFLOW)) {
+			x->rx_gmac_overflow++;
+			*status = OVERFLOW_ERR;
+		}
+
+		if (unlikely(((rdes3 & XGMAC_RDES3_ET) >> 16) == XGMAC_RDES3_CRC)) {
+			x->rx_crc_errors++;
+			stats->rx_crc_errors++;
+			*status = CRC_ERR;
+		}
+
+		if (unlikely(((rdes3 & XGMAC_RDES3_ET) >> 16) == XGMAC_RDES3_DRIBBLE)) {
+			x->dribbling_bit++;
+			*status = DRIBBLE_ERR;
+		}
+
+		if (unlikely(((rdes3 & XGMAC_RDES3_ET) >> 16) == XGMAC_RDES3_RECEIVE_ERROR)) {
+			x->rx_mii++;
+			*status = RECEIVE_ERR;
+		}
+
 		return discard_frame;
+	}
 
 	return good_frame;
+}
+
+static int dwxgmac2_get_rx_status(void *data, struct stmmac_extra_stats *x,
+				  struct dma_desc *p)
+{
+	int status;
+
+	return dwxgmac2_get_rx_status_err(data, x, p, &status);
 }
 
 static int dwxgmac2_get_tx_len(struct dma_desc *p)
@@ -346,6 +382,19 @@ static void dwxgmac2_set_tbs(struct dma_edesc *p, u32 sec, u32 nsec)
 	p->des7 = 0;
 }
 
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+static void dwxgmac2_set_hw_ts(struct dma_desc *p, u32 pid)
+{
+	p->des0 = 0;
+	p->des1 = 0;
+	p->des2 = 0;
+	p->des3 = 0;
+	p->des0 = cpu_to_le32(pid & XGMAC_TDES0_TTSL);
+	p->des3 |= cpu_to_le32(XGMAC_TDES3_CTXT);
+	p->des3 |= cpu_to_le32(XGMAC_TDES3_PIDV);
+}
+#endif
+
 static void dwxgmac2_display_ring(void *head, unsigned int size, bool rx,
 				  dma_addr_t dma_rx_phy, unsigned int desc_size)
 {
@@ -399,6 +448,7 @@ static void dwxgmac2_display_ring(void *head, unsigned int size, bool rx,
 const struct stmmac_desc_ops dwxgmac210_desc_ops = {
 	.tx_status = dwxgmac2_get_tx_status,
 	.rx_status = dwxgmac2_get_rx_status,
+	.rx_status_err = dwxgmac2_get_rx_status_err,
 	.get_tx_len = dwxgmac2_get_tx_len,
 	.get_tx_owner = dwxgmac2_get_tx_owner,
 	.set_tx_owner = dwxgmac2_set_tx_owner,
@@ -427,4 +477,7 @@ const struct stmmac_desc_ops dwxgmac210_desc_ops = {
 	.set_vlan = dwxgmac2_set_vlan,
 	.set_tbs = dwxgmac2_set_tbs,
 	.display_ring = dwxgmac2_display_ring,
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+	.set_hw_ts = dwxgmac2_set_hw_ts,
+#endif
 };

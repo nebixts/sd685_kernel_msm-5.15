@@ -293,7 +293,11 @@ static const struct rpmsg_endpoint_ops glink_endpoint_ops;
 #define GLINK_CMD_RX_INTENT_REQ		7
 #define GLINK_CMD_RX_INTENT_REQ_ACK	8
 #define GLINK_CMD_TX_DATA		9
+<<<<<<< HEAD
 #define GLINK_CMD_TX_DATA_ZERO_COPY 	10
+=======
+#define GLINK_CMD_TX_DATA_ZERO_COPY     10
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 #define GLINK_CMD_CLOSE_ACK		11
 #define GLINK_CMD_TX_DATA_CONT		12
 #define GLINK_CMD_READ_NOTIF		13
@@ -480,8 +484,11 @@ static void qcom_glink_send_read_notify(struct qcom_glink *glink)
 	msg.param1 = 0;
 	msg.param2 = 0;
 
+<<<<<<< HEAD
 	GLINK_INFO(glink->ilc, "send READ NOTIFY cmd\n");
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 	qcom_glink_tx_write(glink, &msg, sizeof(msg), NULL, 0);
 
 	mbox_send_message(glink->mbox_chan, NULL);
@@ -530,7 +537,10 @@ static int qcom_glink_tx(struct qcom_glink *glink,
 			goto out;
 		}
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 		if (qcom_glink_tx_avail(glink) >= tlen)
 			glink->sent_read_notify = false;
 	}
@@ -1459,7 +1469,7 @@ static int qcom_glink_send_signals(struct qcom_glink *glink,
 	msg.param1 = cpu_to_le16(channel->lcid);
 	msg.param2 = cpu_to_le32(sigs);
 
-	GLINK_INFO(glink->ilc, "sigs:%d\n", sigs);
+	GLINK_INFO(glink->ilc, "sigs:0x%x\n", sigs);
 	return qcom_glink_tx(glink, &msg, sizeof(msg), NULL, 0, true);
 }
 
@@ -1490,7 +1500,7 @@ static int qcom_glink_handle_signals(struct qcom_glink *glink,
 
 	channel->rsigs = signals;
 
-	CH_INFO(channel, "old:%d new:%d\n", old, channel->rsigs);
+	CH_INFO(channel, "old:0x%x new:0x%x\n", old, channel->rsigs);
 	if (channel->ept.sig_cb) {
 		channel->ept.sig_cb(channel->ept.rpdev, channel->ept.priv,
 				    old, channel->rsigs);
@@ -1530,7 +1540,10 @@ static int qcom_glink_native_rx(struct qcom_glink *glink, int iterations)
 	wake_up_all(&glink->tx_avail_notify);
 
 	for (i = 0; i < iterations || !iterations; i++) {
+<<<<<<< HEAD
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 		avail = qcom_glink_rx_avail(glink);
 		if (avail < sizeof(msg))
 			break;
@@ -1980,7 +1993,10 @@ static int __qcom_glink_send(struct glink_channel *channel,
 		chunk_size, left_size);
 	ret = qcom_glink_tx(glink, &req, sizeof(req), data, chunk_size, wait);
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 	/* Mark intent available if we failed */
 	if (ret) {
 		if (intent)
@@ -2001,14 +2017,23 @@ static int __qcom_glink_send(struct glink_channel *channel,
 		req.chunk_size = cpu_to_le32(chunk_size);
 		req.left_size = cpu_to_le32(left_size);
 
+<<<<<<< HEAD
 		CH_INFO(channel, "iid:%d chunk_size:%d left_size:%d\n", iid,
 			chunk_size, left_size);
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 		ret = qcom_glink_tx(glink, &req, sizeof(req), data,
 				    chunk_size, wait);
 
 		/* Mark intent available if we failed */
+<<<<<<< HEAD
 		if (ret && intent) {
 			intent->in_use = false;
+=======
+		if (ret) {
+			if (intent)
+				intent->in_use = false;
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 			break;
 		}
 	}
@@ -2076,6 +2101,7 @@ static int qcom_glink_set_sigs(struct rpmsg_endpoint *ept, u32 set, u32 clear)
 
 	channel->lsigs = sigs;
 
+	CH_INFO(channel, "old:0x%x new:0x%x\n", sigs, channel->lsigs);
 	return qcom_glink_send_signals(glink, channel, sigs);
 }
 

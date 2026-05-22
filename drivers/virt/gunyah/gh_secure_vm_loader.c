@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -22,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/fs.h>
 #include <linux/of.h>
+#include <soc/qcom/boot_stats.h>
 
 #include "gh_private.h"
 #include "gh_secure_vm_virtio_backend.h"
@@ -58,6 +58,8 @@ const static struct {
 	{GH_TRUSTED_VM, "trustedvm"},
 	{GH_CPUSYS_VM, "cpusys_vm"},
 	{GH_OEM_VM, "oemvm"},
+	{GH_TELE_VM, "televm"},
+	{GH_FOTA_VM, "fotavm"},
 	{GH_ROBOTICS_VM1, "roboticsvm1"},
 	{GH_ROBOTICS_VM2, "rdcapvm"},
 };
@@ -306,6 +308,7 @@ long gh_vm_ioctl_set_fw_name(struct gh_vm *vm, unsigned long arg)
 	struct gh_fw_name vm_fw_name;
 	struct device *dev;
 	long ret = -EINVAL;
+	char marker_svm_creating[80] = {'\0'};
 
 	if (copy_from_user(&vm_fw_name, (void __user *)arg, sizeof(vm_fw_name)))
 		return -EFAULT;
@@ -329,6 +332,8 @@ long gh_vm_ioctl_set_fw_name(struct gh_vm *vm, unsigned long arg)
 
 	dev = sec_vm_dev->dev;
 
+	cleanup_gvm_dump_ctx(sec_vm_dev->vmid);
+
 	ret = gh_sec_vm_loader_load_fw(sec_vm_dev, vm);
 	if (ret) {
 		dev_err(dev, "Loading secure VM %s to memory failed %ld\n",
@@ -340,6 +345,11 @@ long gh_vm_ioctl_set_fw_name(struct gh_vm *vm, unsigned long arg)
 						"%s", vm_fw_name.name);
 
 	mutex_unlock(&vm->vm_lock);
+
+	snprintf(marker_svm_creating, sizeof(marker_svm_creating), "M - Creating SVM : %s",
+		vm->fw_name);
+	update_marker(marker_svm_creating);
+
 	gh_uevent_notify_change(GH_EVENT_CREATE_VM, vm);
 	return ret;
 
@@ -381,10 +391,25 @@ int gh_secure_vm_loader_reclaim_fw(struct gh_vm *vm)
 
 	ret = gh_reclaim_mem(vm, sec_vm_dev->fw_phys,
 			sec_vm_dev->fw_size, sec_vm_dev->system_vm);
-	if (!ret && !sec_vm_dev->is_static) {
-		dma_free_coherent(dev, sec_vm_dev->fw_size, sec_vm_dev->fw_virt,
-			phys_to_dma(dev, sec_vm_dev->fw_phys));
+
+	if (!ret) {
+
+		/*
+		 * SVM mem reclaim succeeded, collect the SVM dump if dump collection is
+		 * enabled.
+		 *
+		 * Ignore the return value of debugFS creation as failure should not impact
+		 * other cleanup.
+		 */
+
+		if (sec_vm_dev->is_static) {
+			collect_gvm_dump(sec_vm_dev->dev->of_node);
+		} else
+			dma_free_coherent(dev, sec_vm_dev->fw_size, sec_vm_dev->fw_virt,
+				phys_to_dma(dev, sec_vm_dev->fw_phys));
+
 	}
+	pr_err("%s failed ret value %d\n", __func__, ret);
 
 	return ret;
 }

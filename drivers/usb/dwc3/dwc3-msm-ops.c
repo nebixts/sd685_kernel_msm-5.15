@@ -34,6 +34,7 @@ static unsigned long dwc3_pt_reg(struct pt_regs *regs, int reg)
 #endif
 }
 
+<<<<<<< HEAD
 static int entry_dwc3_suspend_common(struct kretprobe_instance *ri,
 				struct pt_regs *regs)
 {
@@ -113,11 +114,13 @@ static int exit_usb_ep_set_maxpacket_limit(struct kretprobe_instance *ri,
 	return 0;
 }
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 static int entry_dwc3_gadget_run_stop(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
-	struct dwc3 *dwc = (struct dwc3 *)regs->regs[0];
-	int is_on = (int)regs->regs[1];
+	struct dwc3 *dwc = (struct dwc3 *)dwc3_pt_reg(regs, 0);
+	int is_on = (int)dwc3_pt_reg(regs, 1);
 
 	if (is_on) {
 		/*
@@ -150,17 +153,15 @@ static int entry_dwc3_gadget_run_stop(struct kretprobe_instance *ri,
 	return 0;
 }
 
-static int entry_dwc3_send_gadget_ep_cmd(struct kretprobe_instance *ri,
+static int entry___dwc3_gadget_ep_enable(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
-	struct dwc3_ep *dep = (struct dwc3_ep *)regs->regs[0];
-	unsigned int cmd = (unsigned int)regs->regs[1];
-	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_ep *dep = (struct dwc3_ep *)dwc3_pt_reg(regs, 0);
+	unsigned int action = (unsigned int)dwc3_pt_reg(regs, 1);
 
-	if (cmd == DWC3_DEPCMD_ENDTRANSFER)
-		dwc3_msm_notify_event(dwc,
-				DWC3_CONTROLLER_NOTIFY_DISABLE_UPDXFER,
-				dep->number);
+	/* DWC3_DEPCFG_ACTION_MODIFY is only done during CONNDONE */
+	if (action == DWC3_DEPCFG_ACTION_MODIFY && dep->number == 1)
+		dwc3_msm_notify_event(dep->dwc, DWC3_CONTROLLER_CONNDONE_EVENT, 0);
 
 	return 0;
 }
@@ -168,29 +169,10 @@ static int entry_dwc3_send_gadget_ep_cmd(struct kretprobe_instance *ri,
 static int entry_dwc3_gadget_reset_interrupt(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
-	struct dwc3 *dwc = (struct dwc3 *)regs->regs[0];
+	struct dwc3 *dwc = (struct dwc3 *)dwc3_pt_reg(regs, 0);
 
 	dwc3_core_stop_hw_active_transfers(dwc);
 	dwc3_msm_notify_event(dwc, DWC3_CONTROLLER_NOTIFY_CLEAR_DB, 0);
-	return 0;
-}
-
-static int entry_dwc3_gadget_conndone_interrupt(struct kretprobe_instance *ri,
-				   struct pt_regs *regs)
-{
-	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-
-	data->dwc = (struct dwc3 *)regs->regs[0];
-	return 0;
-}
-
-static int exit_dwc3_gadget_conndone_interrupt(struct kretprobe_instance *ri,
-				   struct pt_regs *regs)
-{
-	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-
-	dwc3_msm_notify_event(data->dwc, DWC3_CONTROLLER_CONNDONE_EVENT, 0);
-
 	return 0;
 }
 
@@ -198,10 +180,10 @@ static int entry_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct usb_gadget *g = (struct usb_gadget *)regs->regs[0];
+	struct usb_gadget *g = (struct usb_gadget *)dwc3_pt_reg(regs, 0);
 
 	data->dwc = gadget_to_dwc(g);
-	data->xi0 = (int)regs->regs[1];
+	data->xi0 = (int)dwc3_pt_reg(regs, 1);
 	dwc3_msm_notify_event(data->dwc, DWC3_CONTROLLER_PULLUP_ENTER,
 				data->xi0);
 
@@ -222,7 +204,7 @@ static int exit_dwc3_gadget_pullup(struct kretprobe_instance *ri,
 static int entry___dwc3_gadget_start(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
-	struct dwc3 *dwc = (struct dwc3 *)regs->regs[0];
+	struct dwc3 *dwc = (struct dwc3 *)dwc3_pt_reg(regs, 0);
 
 	/*
 	 * Setup USB GSI event buffer as controller soft reset has cleared
@@ -233,6 +215,7 @@ static int entry___dwc3_gadget_start(struct kretprobe_instance *ri,
 	return 0;
 }
 
+<<<<<<< HEAD
 static int entry_trace_event_raw_event_dwc3_log_request(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
@@ -304,6 +287,8 @@ static int exit_dwc3_host_exit(struct kretprobe_instance *ri,
 
 
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 #define ENTRY_EXIT(name) {\
 	.handler = exit_##name,\
 	.entry_handler = entry_##name,\
@@ -321,8 +306,8 @@ static int exit_dwc3_host_exit(struct kretprobe_instance *ri,
 
 static struct kretprobe dwc3_msm_probes[] = {
 	ENTRY(dwc3_gadget_run_stop),
-	ENTRY(dwc3_send_gadget_ep_cmd),
 	ENTRY(dwc3_gadget_reset_interrupt),
+<<<<<<< HEAD
 	ENTRY_EXIT(dwc3_gadget_conndone_interrupt),
 	ENTRY_EXIT(dwc3_host_exit),
 	ENTRY_EXIT(dwc3_gadget_pullup),
@@ -334,6 +319,11 @@ static struct kretprobe dwc3_msm_probes[] = {
 	ENTRY(trace_event_raw_event_dwc3_log_trb),
 	ENTRY(trace_event_raw_event_dwc3_log_event),
 	ENTRY(trace_event_raw_event_dwc3_log_ep),
+=======
+	ENTRY(__dwc3_gadget_ep_enable),
+	ENTRY_EXIT(dwc3_gadget_pullup),
+	ENTRY(__dwc3_gadget_start),
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 };
 
 

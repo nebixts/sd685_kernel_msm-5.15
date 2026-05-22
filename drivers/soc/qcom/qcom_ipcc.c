@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -521,11 +522,9 @@ static const struct of_device_id qcom_ipcc_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, qcom_ipcc_of_match);
 
-#ifdef CONFIG_PM_SLEEP
 static const struct dev_pm_ops qcom_ipcc_dev_pm_ops = {
 	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(qcom_ipcc_pm_suspend, qcom_ipcc_pm_resume)
 };
-#endif
 
 static struct platform_driver qcom_ipcc_driver = {
 	.probe = qcom_ipcc_probe,
@@ -533,9 +532,7 @@ static struct platform_driver qcom_ipcc_driver = {
 	.driver = {
 		.name = "qcom_ipcc",
 		.of_match_table = qcom_ipcc_of_match,
-#ifdef CONFIG_PM_SLEEP
 		.pm = &qcom_ipcc_dev_pm_ops,
-#endif
 	},
 };
 

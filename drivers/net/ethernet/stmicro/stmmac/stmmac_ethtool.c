@@ -75,6 +75,11 @@ static const struct stmmac_stats stmmac_gstrings_stats[] = {
 	STMMAC_STAT(sa_rx_filter_fail),
 	STMMAC_STAT(rx_missed_cntr),
 	STMMAC_STAT(rx_overflow_cntr),
+	STMMAC_STAT(q_rx_overflow_cntr[0]),
+	STMMAC_STAT(q_rx_overflow_cntr[1]),
+	STMMAC_STAT(q_rx_overflow_cntr[2]),
+	STMMAC_STAT(q_rx_overflow_cntr[3]),
+	STMMAC_STAT(q_rx_overflow_cntr[4]),
 	STMMAC_STAT(rx_vlan),
 	STMMAC_STAT(rx_split_hdr_pkt_n),
 	/* Tx/Rx IRQ error info */
@@ -87,6 +92,7 @@ static const struct stmmac_stats stmmac_gstrings_stats[] = {
 	STMMAC_STAT(rx_watchdog_irq),
 	STMMAC_STAT(tx_early_irq),
 	STMMAC_STAT(fatal_bus_error_irq),
+	STMMAC_STAT(tx_buf_unav_irq),
 	/* Tx/Rx IRQ Events */
 	STMMAC_STAT(rx_early_irq),
 	STMMAC_STAT(threshold),
@@ -273,12 +279,22 @@ static const struct stmmac_stats stmmac_mmc[] = {
 static const char stmmac_qstats_tx_string[][ETH_GSTRING_LEN] = {
 	"tx_pkt_n",
 	"tx_irq_n",
+	"fatal_bus_err_irq_n",
+	"txch_desc_list_laddr",
+	"txch_desc_ring_len",
+	"txch_desc_tail",
+	"tx_buf_unav_irq",
 #define STMMAC_TXQ_STATS ARRAY_SIZE(stmmac_qstats_tx_string)
 };
 
 static const char stmmac_qstats_rx_string[][ETH_GSTRING_LEN] = {
 	"rx_pkt_n",
 	"rx_irq_n",
+	"rx_buf_unav_irq_n",
+	"rx_process_stopped_irq",
+	"rxch_desc_list_laddr",
+	"rxch_desc_ring_len",
+	"rxch_desc_tail",
 #define STMMAC_RXQ_STATS ARRAY_SIZE(stmmac_qstats_rx_string)
 };
 
@@ -306,10 +322,6 @@ static int stmmac_ethtool_get_link_ksettings(struct net_device *dev,
 					     struct ethtool_link_ksettings *cmd)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-	struct phy_device *phy = dev->phydev;
-
-	if (!phy)
-		return -ENODEV;
 
 	if (!netif_running(dev))
 		return -EBUSY;
@@ -403,11 +415,21 @@ stmmac_ethtool_set_link_ksettings(struct net_device *dev,
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
 	struct phy_device *phy = dev->phydev;
+	int rc = 0;
 
 	if (!phy) {
 		pr_err("%s: %s: PHY is not registered\n",
 		       __func__, dev->name);
 		return -ENODEV;
+	}
+
+	if (priv->plat->has_xgmac &&
+	    (priv->plat->interface == PHY_INTERFACE_MODE_USXGMII ||
+	     priv->plat->interface == PHY_INTERFACE_MODE_SGMII)) {
+		if (cmd->base.autoneg == AUTONEG_DISABLE)
+			return -EINVAL;
+		else if (cmd->base.speed) /* Autoneg on and speed change is not supported */
+			return 0;
 	}
 
 	if  (!priv->plat->has_gmac4 && (priv->hw->pcs & STMMAC_PCS_RGMII ||
@@ -432,10 +454,16 @@ stmmac_ethtool_set_link_ksettings(struct net_device *dev,
 		return 0;
 	}
 
-	if (!priv->plat->mac2mac_en)
-		return phylink_ethtool_ksettings_set(priv->phylink, cmd);
-	else
+	if (!priv->plat->mac2mac_en) {
+		rc = phylink_ethtool_ksettings_set(priv->phylink, cmd);
+
+		if (phy)
+			linkmode_copy(priv->adv_old, phy->advertising);
+
+		return rc;
+	} else {
 		return 0;
+	}
 
 }
 
@@ -542,14 +570,13 @@ stmmac_get_pauseparam(struct net_device *netdev,
 		if (!adv_lp.pause)
 			return;
 	} else {
-		if (!priv->plat->mac2mac_en) {
+		if (!priv->plat->mac2mac_en)
 			phylink_ethtool_get_pauseparam(priv->phylink, pause);
-		} else {
-			if (priv->flow_ctrl & FLOW_RX)
-				pause->rx_pause = 1;
-			if (priv->flow_ctrl & FLOW_TX)
-				pause->tx_pause = 1;
-		}
+
+		if (priv->flow_ctrl & FLOW_RX)
+			pause->rx_pause = 1;
+		if (priv->flow_ctrl & FLOW_TX)
+			pause->tx_pause = 1;
 	}
 }
 
@@ -664,6 +691,11 @@ static void stmmac_get_ethtool_stats(struct net_device *dev,
 			stmmac_mac_debug(priv, priv->ioaddr,
 					(void *)&priv->xstats,
 					rx_queues_count, tx_queues_count);
+
+		if (priv->synopsys_id == DWXLGMAC_CORE_3_10)
+			stmmac_desc_stats(priv, priv->ioaddr, &priv->xstats,
+					  priv->plat->tx_queues_to_use,
+					  priv->plat->rx_queues_to_use);
 	}
 	for (i = 0; i < STMMAC_STATS_LEN; i++) {
 		char *p = (char *)priv + stmmac_gstrings_stats[i].stat_offset;
@@ -775,12 +807,6 @@ static void stmmac_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
 
-	if (!priv->phydev) {
-		pr_err("%s: %s: PHY is not registered\n",
-		       __func__, dev->name);
-		return;
-	}
-
 	if (!priv->plat->pmt)
 		return phylink_ethtool_get_wol(priv->phylink, wol);
 
@@ -806,8 +832,11 @@ static int stmmac_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 		return -ENODEV;
 	}
 
-	if (!device_can_wakeup(priv->device))
+	if (!device_can_wakeup(priv->device) && priv->plat->pmt)
 		return -EOPNOTSUPP;
+
+	if (priv->plat->enable_wol)
+		return priv->plat->enable_wol(dev, wol);
 
 	if (!priv->plat->pmt) {
 		wol->cmd = ETHTOOL_SWOL;
@@ -858,20 +887,41 @@ static int stmmac_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 static int stmmac_ethtool_op_get_eee(struct net_device *dev,
 				     struct ethtool_eee *edata)
 {
+	int val;
 	struct stmmac_priv *priv = netdev_priv(dev);
 
-	if (!priv->dma_cap.eee)
+	if (!priv->dma_cap.eee || priv->plat->mac2mac_en)
 		return -EOPNOTSUPP;
-
 	edata->eee_enabled = priv->eee_enabled;
 	edata->eee_active = priv->eee_active;
 	edata->tx_lpi_timer = priv->tx_lpi_timer;
 	edata->tx_lpi_enabled = priv->tx_lpi_enabled;
 
-	if (!priv->plat->mac2mac_en)
-		return phylink_ethtool_get_eee(priv->phylink, edata);
-	else
-		return 0;
+	val = phylink_ethtool_get_eee(priv->phylink, edata);
+	if (val < 0)
+		return val;
+
+	/* Currently, the eee status is shown active even in case of speeds for which
+	 * eee is not supported. The below code checks if eee_active after returning from
+	 * phylink_ethtool_get_eee function, and using phy_lookup_setting, we reset
+	 * eee_active if the link speed is not advertised or supported.
+	 */
+	if (edata->eee_active) {
+		__ETHTOOL_DECLARE_LINK_MODE_MASK(common);
+		__ETHTOOL_DECLARE_LINK_MODE_MASK(adv) = {};
+		__ETHTOOL_DECLARE_LINK_MODE_MASK(lp) = {};
+
+		ethtool_convert_legacy_u32_to_link_mode(adv, edata->advertised);
+		ethtool_convert_legacy_u32_to_link_mode(lp, edata->lp_advertised);
+		linkmode_and(common, adv, lp);
+
+		edata->eee_active = !!phy_lookup_setting(priv->phydev->speed,
+							priv->phydev->duplex,
+							common,
+							true);
+	}
+
+	return 0;
 }
 
 static int stmmac_ethtool_op_set_eee(struct net_device *dev,
@@ -886,6 +936,22 @@ static int stmmac_ethtool_op_set_eee(struct net_device *dev,
 	if (priv->tx_lpi_enabled != edata->tx_lpi_enabled)
 		netdev_warn(priv->dev,
 			    "Setting EEE tx-lpi is not supported\n");
+
+	if (priv->hw->xpcs) {
+		ret = xpcs_config_eee(priv->hw->xpcs,
+				      priv->plat->mult_fact_100ns,
+				      edata->eee_enabled);
+		if (ret)
+			return ret;
+	}
+
+	if (priv->hw->qxpcs) {
+		ret = qcom_xpcs_config_eee(priv->hw->qxpcs,
+					   priv->plat->mult_fact_100ns,
+					   edata->eee_enabled);
+		if (ret)
+			return ret;
+	}
 
 	if (!edata->eee_enabled)
 		stmmac_disable_eee_mode(priv);

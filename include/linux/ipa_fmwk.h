@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018 - 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPA_FMWK_H_
@@ -396,6 +396,24 @@ struct ipa_eth_data {
 
 	bool (*ipa_eth_client_exist)(
 		enum ipa_eth_client_type eth_client_type, int inst_id);
+
+	int (*ipa_eth_get_config_type)(
+		enum ipa_eth_client_type client_type,
+		int inst_id,
+		struct ipa_eth_config *eth_config);
+	int (*ipa_eth_qos_get_num_pipes)(
+		u8 inst_id, u8 *num_pipes, enum ipa_eth_pipe_direction dir);
+	int (*ipa_eth_qos_get_qos_info)
+	(
+		u8 inst_id,
+		u8 idx,
+		struct ipa_eth_qos_info *info,
+		enum ipa_eth_pipe_direction dir
+	);
+
+	int (*ipa_eth_client_enable_pipes)(struct ipa_eth_client *client);
+	int (*ipa_eth_client_disable_pipes)(struct ipa_eth_client *client);
+
 };
 
 #if IS_ENABLED(CONFIG_IPA3)

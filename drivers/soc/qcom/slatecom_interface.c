@@ -33,7 +33,6 @@
 #include <linux/soc/qcom/slate_events_bridge_intf.h>
 
 #include <uapi/linux/slatecom_interface.h>
-
 #include "slatecom.h"
 #include "slatecom_rpmsg.h"
 

@@ -803,10 +803,15 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_MBSSID_ELEMS] = { .type = NLA_NESTED },
 	[NL80211_ATTR_RADAR_BACKGROUND] = { .type = NLA_FLAG },
 	[NL80211_ATTR_AP_SETTINGS_FLAGS] = { .type = NLA_U32 },
+#ifndef CFG80211_PROP_MULTI_LINK_EXT_SUPPORT
 	[NL80211_ATTR_EHT_CAPABILITY] =
 		NLA_POLICY_RANGE(NLA_BINARY,
 				 NL80211_EHT_MIN_CAPABILITY_LEN,
 				 NL80211_EHT_MAX_CAPABILITY_LEN),
+#else /* CFG80211_PROP_MULTI_LINK_EXT_SUPPORT */
+	[NL80211_ATTR_EHT_CAPABILITY] = { .type = NLA_BINARY,
+					  .len = NL80211_EHT_MAX_CAPABILITY_LEN },
+#endif /* CFG80211_PROP_MULTI_LINK_EXT_SUPPORT */
 	[NL80211_ATTR_DISABLE_EHT] = { .type = NLA_FLAG },
 	[NL80211_ATTR_MLO_LINKS] =
 		NLA_POLICY_NESTED_ARRAY(nl80211_policy),
@@ -815,17 +820,18 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_MLD_ADDR] = NLA_POLICY_EXACT_LEN(ETH_ALEN),
 	[NL80211_ATTR_MLO_SUPPORT] = { .type = NLA_FLAG },
 	[NL80211_ATTR_MAX_NUM_AKM_SUITES] = { .type = NLA_REJECT },
-	[NL80211_ATTR_PUNCT_BITMAP] =
-		NLA_POLICY_FULL_RANGE(NLA_U32, &nl80211_punct_bitmap_range),
 	[NL80211_ATTR_EHT_PUNCTURE_BITMAP] = { .type = NLA_U32 },
 	[NL80211_ATTR_MLD_MAC] = NLA_POLICY_EXACT_LEN_WARN(ETH_ALEN),
-	[NL80211_ATTR_MLD_REFERENCE] = { .type = NLA_U32 },
+	[NL80211_ATTR_MLD_REFERENCE] = { .type = NLA_BINARY, .len = IFNAMSIZ - 1 },
 	[NL80211_ATTR_MLD_LINK_MACS] = { .type = NLA_NESTED },
 	[NL80211_ATTR_MLD_LINK_IDS] = { .type = NLA_NESTED },
 	[NL80211_ATTR_RECONFIG] = { .type = NLA_FLAG },
 	[NL80211_ATTR_MLO_LINK_ID] =
 		NLA_POLICY_RANGE(NLA_U8, 0, NL80211_MLD_MAX_NUM_LINKS),
+	[NL80211_ATTR_PUNCT_BITMAP] =
+		NLA_POLICY_FULL_RANGE(NLA_U32, &nl80211_punct_bitmap_range),
 
+	[NL80211_ATTR_RADIO_IFACE] = { .type = NLA_BINARY, .len = IFNAMSIZ - 1 },
 };
 
 /* policy for the key attributes */
@@ -4342,9 +4348,15 @@ static int _nl80211_new_interface(struct sk_buff *skb, struct genl_info *info)
 	if (info->attrs[NL80211_ATTR_MLD_REFERENCE]) {
 		if (wiphy_ext_feature_isset(&rdev->wiphy, NL80211_EXT_FEATURE_MLO))
 			params.mld_reference =
-				nla_get_u32(info->attrs[NL80211_ATTR_MLD_REFERENCE]);
+				nla_data(info->attrs[NL80211_ATTR_MLD_REFERENCE]);
 		else
 			return -EOPNOTSUPP;
+	}
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	if (rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_MLO) {
+		if (info->attrs[NL80211_ATTR_RADIO_IFACE])
+			params.radio_iface =
+				nla_data(info->attrs[NL80211_ATTR_RADIO_IFACE]);
 	}
 #endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
@@ -6702,6 +6714,7 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 		    sinfo->assoc_req_ies))
 		goto nla_put_failure;
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	if (sinfo->assoc_resp_ies_len &&
 	    nla_put(msg, NL80211_ATTR_RESP_IE, sinfo->assoc_resp_ies_len,
 		    sinfo->assoc_resp_ies))
@@ -6717,6 +6730,7 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 			    sinfo->mld_addr))
 			goto nla_put_failure;
 	}
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 	cfg80211_sinfo_release_content(sinfo);
 	genlmsg_end(msg, hdr);
@@ -17461,8 +17475,13 @@ static const struct genl_small_ops nl80211_small_ops[] = {
 		.cmd = NL80211_CMD_ADD_LINK_STA,
 		.doit = nl80211_add_link_station,
 		.flags = GENL_UNS_ADMIN_PERM,
+#ifndef CFG80211_PROP_MULTI_LINK_EXT_SUPPORT
 		.internal_flags = IFLAGS(NL80211_FLAG_NEED_NETDEV_UP |
 					 NL80211_FLAG_MLO_VALID_LINK_ID),
+#else /* CFG80211_PROP_MULTI_LINK_EXT_SUPPORT */
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.internal_flags = IFLAGS(NL80211_FLAG_NEED_NETDEV_UP),
+#endif /* CFG80211_PROP_MULTI_LINK_EXT_SUPPORT */
 	},
 	{
 		.cmd = NL80211_CMD_MODIFY_LINK_STA,
@@ -19999,9 +20018,12 @@ int cfg80211_external_auth_request(struct net_device *dev,
 	    nla_put(msg, NL80211_ATTR_BSSID, ETH_ALEN, params->bssid) ||
 	    (params->ssid.ssid_len &&
 	     nla_put(msg, NL80211_ATTR_SSID, params->ssid.ssid_len,
-		     params->ssid.ssid)) ||
-	    (!is_zero_ether_addr(params->mld_addr) &&
-	     nla_put(msg, NL80211_ATTR_MLD_ADDR, ETH_ALEN, params->mld_addr)))
+		     params->ssid.ssid))
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
+	    || (!is_zero_ether_addr(params->mld_addr) &&
+	     nla_put(msg, NL80211_ATTR_MLD_ADDR, ETH_ALEN, params->mld_addr))
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	   )
 		goto nla_put_failure;
 
 	genlmsg_end(msg, hdr);
@@ -20043,6 +20065,7 @@ void cfg80211_update_owe_info_event(struct net_device *netdev,
 	    nla_put(msg, NL80211_ATTR_IE, owe_info->ie_len, owe_info->ie))
 		goto nla_put_failure;
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	if (owe_info->assoc_link_id != -1) {
 		if (nla_put_u8(msg, NL80211_ATTR_MLO_LINK_ID,
 			       owe_info->assoc_link_id))
@@ -20053,6 +20076,7 @@ void cfg80211_update_owe_info_event(struct net_device *netdev,
 			    owe_info->peer_mld_addr))
 			goto nla_put_failure;
 	}
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 	genlmsg_end(msg, hdr);
 

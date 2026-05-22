@@ -332,6 +332,38 @@ static const struct clk_parent_data gcc_parents_8[] = {
 	{ .hw = &gpll0_out_even.clkr.hw },
 };
 
+<<<<<<< HEAD
+=======
+static const struct freq_tbl ftbl_gcc_cpuss_ahb_clk_src[] = {
+	F(19200000, P_BI_TCXO, 1, 0, 0),
+	F(50000000, P_GPLL0_OUT_MAIN, 12, 0, 0),
+	F(100000000, P_GPLL0_OUT_MAIN, 6, 0, 0),
+	{ }
+};
+
+static struct clk_rcg2 gcc_cpuss_ahb_clk_src = {
+	.cmd_rcgr = 0x48014,
+	.mnd_width = 0,
+	.hid_width = 5,
+	.parent_map = gcc_parent_map_0,
+	.freq_tbl = ftbl_gcc_cpuss_ahb_clk_src,
+	.clkr.hw.init = &(struct clk_init_data){
+		.name = "gcc_cpuss_ahb_clk_src",
+		.parent_data = gcc_parent_data_0_ao,
+		.num_parents = ARRAY_SIZE(gcc_parent_data_0_ao),
+		.ops = &clk_rcg2_ops,
+	},
+	.clkr.vdd_data = {
+		.vdd_class = &vdd_cx_ao,
+		.num_rate_max = VDD_NUM,
+		.rate_max = (unsigned long[VDD_NUM]) {
+			[VDD_MIN] = 19200000,
+			[VDD_LOW] = 50000000,
+			[VDD_NOMINAL] = 100000000},
+	},
+};
+
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 static const struct freq_tbl ftbl_gcc_emac_ptp_clk_src[] = {
 	F(19200000, P_BI_TCXO, 1, 0, 0),
 	F(50000000, P_GPLL0_OUT_EVEN, 6, 0, 0),
@@ -1304,6 +1336,10 @@ static const struct freq_tbl ftbl_gcc_sdcc2_apps_clk_src[] = {
 	F(25000000, P_GPLL0_OUT_MAIN, 12, 1, 2),
 	F(50000000, P_GPLL0_OUT_MAIN, 12, 0, 0),
 	F(100000000, P_GPLL0_OUT_MAIN, 6, 0, 0),
+<<<<<<< HEAD
+=======
+	F(200000000, P_GPLL0_OUT_MAIN, 3, 0, 0),
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 	F(202000000, P_GPLL9_OUT_MAIN, 4, 0, 0),
 	{ }
 };
@@ -1337,6 +1373,10 @@ static const struct freq_tbl ftbl_gcc_sdcc4_apps_clk_src[] = {
 	F(9600000, P_BI_TCXO, 2, 0, 0),
 	F(19200000, P_BI_TCXO, 1, 0, 0),
 	F(50000000, P_GPLL0_OUT_MAIN, 12, 0, 0),
+<<<<<<< HEAD
+=======
+	F(75000000, P_GPLL0_OUT_MAIN, 8, 0, 0),
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 	F(100000000, P_GPLL0_OUT_MAIN, 6, 0, 0),
 	{ }
 };

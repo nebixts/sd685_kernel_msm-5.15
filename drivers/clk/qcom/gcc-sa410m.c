@@ -206,14 +206,17 @@ static struct clk_alpha_pll gpll7 = {
 
 static const struct alpha_pll_config gpll8_config = {
 	.l = 0x1A,
-	.cal_l = 0x1A,
 	.alpha = 0xAAAAAAAA,
 	.alpha_hi = 0xA,
 	.config_ctl_val = 0x4001055B,
 	.test_ctl_val = 0x00000000,
 	.test_ctl_hi_val = 0x00000001,
-	.user_ctl_val = 0x00000000,
+	.user_ctl_val = 0x01200001,
 	.user_ctl_hi_val = 0x00000004,
+	.vco_val = 0x2 << 20,
+	.vco_mask = GENMASK(21, 20),
+	.main_output_mask = BIT(0),
+	.alpha_en_mask = BIT(24),
 };
 
 static struct clk_alpha_pll gpll8 = {
@@ -479,6 +482,7 @@ static struct clk_rcg2 gcc_emac0_ptp_clk_src = {
 };
 
 static const struct freq_tbl ftbl_gcc_emac0_rgmii_clk_src[] = {
+	F(5000000, P_GPLL0_OUT_AUX2, 10, 1, 6),
 	F(50000000, P_GPLL0_OUT_AUX2, 6, 0, 0),
 	F(125000000, P_GPLL8_OUT_MAIN, 4, 0, 0),
 	F(250000000, P_GPLL8_OUT_MAIN, 2, 0, 0),
@@ -1070,21 +1074,6 @@ static struct clk_branch gcc_cfg_noc_usb3_prim_axi_clk = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch gcc_cpuss_gnoc_clk = {
-	.halt_reg = 0x2b004,
-	.halt_check = BRANCH_HALT_VOTED,
-	.hwcg_reg = 0x2b004,
-	.hwcg_bit = 1,
-	.clkr = {
-		.enable_reg = 0x79004,
-		.enable_mask = BIT(22),
-		.hw.init = &(const struct clk_init_data){
-			.name = "gcc_cpuss_gnoc_clk",
 			.ops = &clk_branch2_ops,
 		},
 	},
@@ -1824,7 +1813,6 @@ static struct clk_regmap *gcc_sa410m_clocks[] = {
 	[GCC_CFG_NOC_USB3_PRIM_AXI_CLK] = &gcc_cfg_noc_usb3_prim_axi_clk.clkr,
 	[GCC_CPUSS_AHB_CLK_SRC] = &gcc_cpuss_ahb_clk_src.clkr,
 	[GCC_CPUSS_AHB_POSTDIV_CLK_SRC] = &gcc_cpuss_ahb_postdiv_clk_src.clkr,
-	[GCC_CPUSS_GNOC_CLK] = &gcc_cpuss_gnoc_clk.clkr,
 	[GCC_DISP_THROTTLE_CORE_CLK] = &gcc_disp_throttle_core_clk.clkr,
 	[GCC_EMAC0_AXI_CLK] = &gcc_emac0_axi_clk.clkr,
 	[GCC_EMAC0_PHY_AUX_CLK] = &gcc_emac0_phy_aux_clk.clkr,
@@ -1928,6 +1916,7 @@ static const struct qcom_reset_map gcc_sa410m_resets[] = {
 	[GCC_USB3UNIPHY_PHY_MP0_BCR] = { 0x1b02c },
 	[GCC_USB3UNIPHY_PHY_MP1_BCR] = { 0x1b030 },
 	[GCC_USB_PHY_CFG_AHB2PHY_BCR] = { 0x1d000 },
+	[GCC_QUSB2PHY_PRIM_BCR] = { 0x1C000 },
 };
 
 static const struct clk_rcg_dfs_data gcc_dfs_clocks[] = {
@@ -1983,9 +1972,11 @@ static int gcc_sa410m_probe(struct platform_device *pdev)
 	 * Keep clocks always enabled:
 	 *	gcc_gpu_iref_en
 	 *	gcc_sys_noc_cpuss_ahb_clk
+	 *	gcc_cpuss_gnoc_clk
 	 */
 	regmap_update_bits(regmap, 0x36100, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x79004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x79004, BIT(22), BIT(22));
 
 	ret = qcom_cc_really_probe(pdev, &gcc_sa410m_desc, regmap);
 	if (ret) {

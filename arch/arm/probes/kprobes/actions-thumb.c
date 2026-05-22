@@ -442,20 +442,24 @@ static unsigned long __kprobes
 t16_emulate_loregs(probes_opcode_t insn,
 		   struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	unsigned long oldcpsr = regs->ARM_cpsr;
-	unsigned long newcpsr;
+	register unsigned long oldcpsr asm("r8") = regs->ARM_cpsr;
+	register unsigned long newcpsr asm("r9");
+	register void *rregs asm("r10") = regs;
+	register void *rfn asm("lr") = asi->insn_fn;
 
 	__asm__ __volatile__ (
 		"msr	cpsr_fs, %[oldcpsr]	\n\t"
+		"mov	r11, r7			\n\t"
 		"ldmia	%[regs], {r0-r7}	\n\t"
 		"blx	%[fn]			\n\t"
 		"stmia	%[regs], {r0-r7}	\n\t"
+		"mov	r7, r11			\n\t"
 		"mrs	%[newcpsr], cpsr	\n\t"
 		: [newcpsr] "=r" (newcpsr)
-		: [oldcpsr] "r" (oldcpsr), [regs] "r" (regs),
-		  [fn] "r" (asi->insn_fn)
-		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
-		  "lr", "memory", "cc"
+		: [oldcpsr] "r" (oldcpsr), [regs] "r" (rregs),
+		  [fn] "r" (rfn)
+		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r11",
+		  "memory", "cc"
 		);
 
 	return (oldcpsr & ~APSR_MASK) | (newcpsr & APSR_MASK);
@@ -523,16 +527,21 @@ static void __kprobes
 t16_emulate_push(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
+	register void *rfn asm("lr") = asi->insn_fn;
+	register void *rregs asm("r10") = regs;
+
 	__asm__ __volatile__ (
+		"mov	r11, r7			\n\t"
 		"ldr	r9, [%[regs], #13*4]	\n\t"
 		"ldr	r8, [%[regs], #14*4]	\n\t"
 		"ldmia	%[regs], {r0-r7}	\n\t"
 		"blx	%[fn]			\n\t"
 		"str	r9, [%[regs], #13*4]	\n\t"
+		"mov	r7, r11			\n\t"
 		:
-		: [regs] "r" (regs), [fn] "r" (asi->insn_fn)
-		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9",
-		  "lr", "memory", "cc"
+		: [regs] "r" (rregs), [fn] "r" (rfn)
+		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r8", "r9", "r11",
+		  "memory", "cc"
 		);
 }
 
@@ -557,16 +566,21 @@ static void __kprobes
 t16_emulate_pop_nopc(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
+	register void *rfn asm("lr") = asi->insn_fn;
+	register void *rregs asm("r8") = regs;
+
 	__asm__ __volatile__ (
+		"mov	r11, r7			\n\t"
 		"ldr	r9, [%[regs], #13*4]	\n\t"
 		"ldmia	%[regs], {r0-r7}	\n\t"
 		"blx	%[fn]			\n\t"
 		"stmia	%[regs], {r0-r7}	\n\t"
 		"str	r9, [%[regs], #13*4]	\n\t"
+		"mov	r7, r11			\n\t"
 		:
-		: [regs] "r" (regs), [fn] "r" (asi->insn_fn)
-		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r9",
-		  "lr", "memory", "cc"
+		: [regs] "r" (rregs), [fn] "r" (rfn)
+		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r9", "r11",
+		  "memory", "cc"
 		);
 }
 
@@ -575,17 +589,21 @@ t16_emulate_pop_pc(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
 	register unsigned long pc asm("r8");
+	register void *rfn asm("lr") = asi->insn_fn;
+	register void *rregs asm("r10") = regs;
 
 	__asm__ __volatile__ (
+		"mov	r11, r7			\n\t"
 		"ldr	r9, [%[regs], #13*4]	\n\t"
 		"ldmia	%[regs], {r0-r7}	\n\t"
 		"blx	%[fn]			\n\t"
 		"stmia	%[regs], {r0-r7}	\n\t"
 		"str	r9, [%[regs], #13*4]	\n\t"
+		"mov	r7, r11			\n\t"
 		: "=r" (pc)
-		: [regs] "r" (regs), [fn] "r" (asi->insn_fn)
-		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r9",
-		  "lr", "memory", "cc"
+		: [regs] "r" (rregs), [fn] "r" (rfn)
+		: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r9", "r11",
+		  "memory", "cc"
 		);
 
 	bx_write_pc(pc, regs);

@@ -262,6 +262,10 @@
 #define GCC_VIDEO_AHB_CLK					251
 #define GCC_VIDEO_XO_CLK					252
 #define GCC_UFS_MEM_CLKREF_CLK					254
+<<<<<<< HEAD
+=======
+
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 #define GCC_EMAC_BCR						0
 #define GCC_GPU_BCR						1
 #define GCC_MMSS_BCR						2

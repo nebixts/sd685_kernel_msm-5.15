@@ -97,8 +97,8 @@ config USB_GADGET_DEBUG_FS
 	   to conserve kernel memory, say "N".
 
 config USB_GADGET_VBUS_DRAW
-	int "Maximum VBUS Power usage (2-500 mA)"
-	range 2 500
+	int "Maximum VBUS Power usage (2-900 mA)"
+	range 2 900
 	default 2
 	help
 	   Some devices need to draw power from USB when they are
@@ -107,7 +107,9 @@ config USB_GADGET_VBUS_DRAW
 	   such as an AC adapter or batteries.
 
 	   Enter the maximum power your device draws through USB, in
-	   milliAmperes.  The permitted range of values is 2 - 500 mA;
+	   milliAmperes.  The permitted range of values depends on the
+	   connected speed: for SuperSpeed and up it is 2 - 900 mA, but
+	   connections at High Speed or slower will be capped at 500 mA;
 	   0 mA would be legal, but can make some hosts misbehave.
 
 	   This value will be used except for system-specific gadget
@@ -237,10 +239,29 @@ config USB_F_GSI
 config USB_F_DIAG
 	tristate
 
+config USB_LOW_MEM_VARIANT
+	bool "USB low memory variant"
+	depends on USB_CONFIGFS_F_GSI
+	help
+	  This config is used when the memory footprint of USB
+	  nneds to be minimized. It reduces the memory usage of
+	  GSI interfaces by limiting the buffer sizes allocated
+	  for the IN endpoints.
+
+config USB_DEFAULT_MEM_VARIANT
+	bool "USB Normal memory variant"
+	depends on USB_CONFIGFS_F_GSI
+	help
+	  This allows the GSI interfaces to use the default
+	  buffer sizes. This config is mainly used when you have
+	  multiple variants of a target, and a particular variant
+	  needs to reduce the buffer sizes and there isn't any
+	  config to distinguish between the different variants.
+
 config USB_F_FS_IPC_LOGGING
         tristate "Enable IPC logging for FunctionFS via f_fs_ipc_log"
 	depends on IPC_LOGGING
-	depends on ARM64
+	depends on ARM64 || ARM
 	help
 	 Enables additional debug messages for FunctionFS driver with the help
 	 of f_fs_ipc_log module and output via IPC Logging mechanism. This can

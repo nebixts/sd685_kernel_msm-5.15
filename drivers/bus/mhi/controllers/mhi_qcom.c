@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.*/
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. */
 
 #include <linux/debugfs.h>
 #include <linux/delay.h>
@@ -252,6 +253,86 @@ static struct mhi_event_config qcom_lemans_mhi_events[] = {
 			false, true, false, 47),
 };
 
+static const struct mhi_channel_config modem_qcom_sa525m_mhi_channels[] = {
+	/* SBL channels  */
+	MHI_CHANNEL_CONFIG_UL(2, "SAHARA", 128, 1, MHI_EE_SBL,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(3, "SAHARA", 128, 1, MHI_EE_SBL,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	/* EDL channels */
+	MHI_CHANNEL_CONFIG_UL(34, "FIREHOSE", 32, 1, MHI_EE_FP,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(35, "FIREHOSE", 32, 1, MHI_EE_FP,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	/* AMSS channels */
+	MHI_CHANNEL_CONFIG_UL(0, "LOOPBACK", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(1, "LOOPBACK", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(4, "DIAG", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(5, "DIAG", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(8, "QDSS", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(9, "QDSS", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(20, "IPCR", 32, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(21, "IPCR", 32, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, true, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(46, "IP_SW1", 1024, 4, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(47, "IP_SW1", 1024, 5, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	/* Hardware channels */
+	MHI_CHANNEL_CONFIG_UL(100, "IP_HW1", 512, 6, MHI_EE_AMSS,
+			      MHI_DB_BRST_ENABLE, false, 0, false, true, 0),
+	MHI_CHANNEL_CONFIG_DL(101, "IP_HW1", 512, 7, MHI_EE_AMSS,
+			      MHI_DB_BRST_ENABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_DL(103, "IP_HW_QDSS", 512, 8, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+};
+
+static struct mhi_event_config modem_qcom_sa525m_mhi_events[] = {
+	MHI_EVENT_CONFIG(0, 1, MHI_ER_CTRL, 64, 0,
+			MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE,
+			false, false, false, 0),
+	MHI_EVENT_CONFIG(1, 2, MHI_ER_DATA, 256, 0,
+			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			false, false, false, 0),
+	MHI_EVENT_CONFIG(2, 3, MHI_ER_DATA, 256, 0,
+			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			false, false, false, 0),
+	MHI_EVENT_CONFIG(3, 4, MHI_ER_DATA, 256, 0,
+			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			false, false, false, 0),
+	MHI_EVENT_CONFIG(4, 5, MHI_ER_DATA, 1024, 0,
+			MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE,
+			false, false, false, 46),
+	MHI_EVENT_CONFIG(5, 6, MHI_ER_DATA, 1024, 0,
+			MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE,
+			false, true, false, 47),
+	MHI_EVENT_CONFIG(6, 7, MHI_ER_DATA, 1024, 5,
+			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			true, false, false, 100),
+	MHI_EVENT_CONFIG(7, 7, MHI_ER_DATA, 1024, 5,
+			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			true, true, false, 101),
+	MHI_EVENT_CONFIG(8, 8, MHI_ER_DATA, 1024, 5,
+			MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			true, false, false, 103),
+};
+
 static const struct mhi_controller_config modem_qcom_sdx65_mhi_config = {
 	.max_channels = 128,
 	.timeout_ms = 2000,
@@ -310,6 +391,16 @@ static const struct mhi_controller_config qcom_lemans_mhi_config = {
 	.event_cfg = qcom_lemans_mhi_events,
 };
 
+static const struct mhi_controller_config modem_qcom_sa525m_mhi_config = {
+	.max_channels = 128,
+	.timeout_ms = 22000,
+	.buf_len = 0x8000,
+	.num_channels = ARRAY_SIZE(modem_qcom_sa525m_mhi_channels),
+	.ch_cfg = modem_qcom_sa525m_mhi_channels,
+	.num_events = ARRAY_SIZE(modem_qcom_sa525m_mhi_events),
+	.event_cfg = modem_qcom_sa525m_mhi_events,
+};
+
 static const struct mhi_pci_dev_info mhi_qcom_sdx65_info = {
 	.device_id = 0x0308,
 	.name = "esoc0",
@@ -323,6 +414,8 @@ static const struct mhi_pci_dev_info mhi_qcom_sdx65_info = {
 	.sfr_support = true,
 	.timesync = true,
 	.drv_support = false,
+	.reboot_notify_support = false,
+	.dev_reset_support = false,
 };
 
 static const struct mhi_pci_dev_info mhi_qcom_lemans_info = {
@@ -336,6 +429,8 @@ static const struct mhi_pci_dev_info mhi_qcom_lemans_info = {
 	.sfr_support = false,
 	.timesync = false,
 	.drv_support = false,
+	.reboot_notify_support = false,
+	.dev_reset_support = false,
 };
 
 static const struct mhi_pci_dev_info mhi_qcom_sdx75_info = {
@@ -351,6 +446,25 @@ static const struct mhi_pci_dev_info mhi_qcom_sdx75_info = {
 	.sfr_support = true,
 	.timesync = true,
 	.drv_support = false,
+	.reboot_notify_support = false,
+	.dev_reset_support = false,
+};
+
+static const struct mhi_pci_dev_info mhi_qcom_sa525m_info = {
+	.device_id = 0x030a,
+	.name = "SA525",
+	.fw_image = "sa525m/xbl_s.melf",
+	.edl_image = "sa525m/edl.mbn",
+	.config = &modem_qcom_sa525m_mhi_config,
+	.bar_num = MHI_PCI_BAR_NUM,
+	.dma_data_width = 64,
+	.allow_m1 = false,
+	.skip_forced_suspend = true,
+	.sfr_support = false,
+	.timesync = false,
+	.drv_support = false,
+	.reboot_notify_support = true,
+	.dev_reset_support = true,
 };
 
 static const struct mhi_pci_dev_info mhi_qcom_debug_info = {
@@ -366,6 +480,8 @@ static const struct mhi_pci_dev_info mhi_qcom_debug_info = {
 	.sfr_support = false,
 	.timesync = false,
 	.drv_support = false,
+	.reboot_notify_support = false,
+	.dev_reset_support = false,
 };
 
 static const struct mhi_pci_dev_info mhi_qcom_sxr_info = {
@@ -379,7 +495,10 @@ static const struct mhi_pci_dev_info mhi_qcom_sxr_info = {
 	.sfr_support = false,
 	.timesync = false,
 	.drv_support = false,
+	.reboot_notify_support = false,
+	.dev_reset_support = false,
 };
+
 static const struct pci_device_id mhi_pcie_device_id[] = {
 	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0308),
 		.driver_data = (kernel_ulong_t) &mhi_qcom_sdx65_info },
@@ -389,6 +508,8 @@ static const struct pci_device_id mhi_pcie_device_id[] = {
 		.driver_data = (kernel_ulong_t) &mhi_qcom_sxr_info },
 	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0116),
 		.driver_data = (kernel_ulong_t) &mhi_qcom_lemans_info },
+	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x030a),
+		.driver_data = (kernel_ulong_t) &mhi_qcom_sa525m_info },
 	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, MHI_PCIE_DEBUG_ID),
 		.driver_data = (kernel_ulong_t) &mhi_qcom_debug_info },
 	{  }
@@ -1163,7 +1284,7 @@ static int mhi_qcom_register_controller(struct mhi_controller *mhi_cntrl,
 		ret = mhi_controller_set_sfr_support(mhi_cntrl,
 						     MHI_MAX_SFR_LEN);
 		if (ret)
-			goto error_register;
+			return -EINVAL;
 	}
 
 	if (dev_info->timesync) {
@@ -1172,7 +1293,7 @@ static int mhi_qcom_register_controller(struct mhi_controller *mhi_cntrl,
 						    &mhi_qcom_lpm_disable,
 						    &mhi_qcom_lpm_enable);
 		if (ret)
-			goto error_register;
+			return -EINVAL;
 	}
 
 	if (dev_info->drv_support)
@@ -1185,15 +1306,10 @@ static int mhi_qcom_register_controller(struct mhi_controller *mhi_cntrl,
 		     PCI_SLOT(pci_dev->devfn));
 	mhi_dev->name = dev_name(&mhi_dev->dev);
 
-	mhi_priv->cntrl_ipc_log = ipc_log_context_create(MHI_IPC_LOG_PAGES,
+	mhi_priv->cntrl_ipc_log = ipc_log_context_create(CONFIG_MHI_BUS_LOG_PAGES,
 							 dev_info->name, 0);
 
 	return 0;
-
-error_register:
-	mhi_unregister_controller(mhi_cntrl);
-
-	return -EINVAL;
 }
 
 int mhi_qcom_pci_probe(struct pci_dev *pci_dev,
@@ -1214,19 +1330,19 @@ int mhi_qcom_pci_probe(struct pci_dev *pci_dev,
 	if (mhi_priv->driver_remove) {
 		ret = mhi_qcom_register_controller(mhi_cntrl, mhi_priv);
 		if (ret)
-			goto error_init_pci;
+			goto error_mhi_register_controller;
 	}
 
 	mhi_priv->powered_on = true;
 
 	ret = mhi_arch_pcie_init(mhi_cntrl);
 	if (ret)
-		goto error_init_pci;
+		goto error_mhi_register_controller;
 
 	ret = dma_set_mask_and_coherent(mhi_cntrl->cntrl_dev,
 					DMA_BIT_MASK(dev_info->dma_data_width));
 	if (ret)
-		goto error_init_pci;
+		goto error_arch_pcie_init;
 
 	if (debug_mode) {
 		if (mhi_cntrl->debugfs_dentry)
@@ -1242,19 +1358,19 @@ int mhi_qcom_pci_probe(struct pci_dev *pci_dev,
 	if (ret) {
 		MHI_CNTRL_ERR("Failed to power up MHI\n");
 		mhi_priv->powered_on = false;
-		goto error_power_up;
+		goto error_arch_pcie_init;
 	}
 
 	pm_runtime_mark_last_busy(mhi_cntrl->cntrl_dev);
 
 	return 0;
 
-error_power_up:
+error_arch_pcie_init:
 	mhi_arch_pcie_deinit(mhi_cntrl);
 
-error_init_pci:
+error_mhi_register_controller:
+	mhi_unregister_controller(mhi_cntrl);
 	mhi_deinit_pci_dev(pci_dev, dev_info);
-
 	dev_set_drvdata(&pci_dev->dev, NULL);
 	mhi_cntrl->cntrl_dev = NULL;
 

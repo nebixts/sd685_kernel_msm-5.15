@@ -88,11 +88,17 @@ static int stmmac_xgmac2_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 	u32 tmp, addr, value = MII_XGMAC_BUSY;
 	int ret;
 
+	if (atomic_read(&priv->plat->phy_clks_suspended))
+		return -EBUSY;
+
 	ret = pm_runtime_get_sync(priv->device);
 	if (ret < 0) {
 		pm_runtime_put_noidle(priv->device);
 		return ret;
 	}
+
+	priv->plat->mdio_op_busy = true;
+	reinit_completion(&priv->plat->mdio_op);
 
 	/* Wait until any existing MII operation is complete */
 	if (readl_poll_timeout(priv->ioaddr + mii_data, tmp,
@@ -143,6 +149,9 @@ static int stmmac_xgmac2_mdio_read(struct mii_bus *bus, int phyaddr, int phyreg)
 err_disable_clks:
 	pm_runtime_put(priv->device);
 
+	priv->plat->mdio_op_busy = false;
+	complete_all(&priv->plat->mdio_op);
+
 	return ret;
 }
 
@@ -156,11 +165,17 @@ static int stmmac_xgmac2_mdio_write(struct mii_bus *bus, int phyaddr,
 	u32 addr, tmp, value = MII_XGMAC_BUSY;
 	int ret;
 
+	if (atomic_read(&priv->plat->phy_clks_suspended))
+		return -EBUSY;
+
 	ret = pm_runtime_get_sync(priv->device);
 	if (ret < 0) {
 		pm_runtime_put_noidle(priv->device);
 		return ret;
 	}
+
+	priv->plat->mdio_op_busy = true;
+	reinit_completion(&priv->plat->mdio_op);
 
 	/* Wait until any existing MII operation is complete */
 	if (readl_poll_timeout(priv->ioaddr + mii_data, tmp,
@@ -205,6 +220,9 @@ static int stmmac_xgmac2_mdio_write(struct mii_bus *bus, int phyaddr,
 
 err_disable_clks:
 	pm_runtime_put(priv->device);
+
+	priv->plat->mdio_op_busy = false;
+	complete_all(&priv->plat->mdio_op);
 
 	return ret;
 }
@@ -357,10 +375,6 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 	struct net_device *ndev = bus->priv;
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	unsigned int mii_address = priv->hw->mii.addr;
-	bool active_high = false;
-
-	if (priv->plat->early_eth)
-		return 0;
 
 #ifdef CONFIG_OF
 	if (priv->device->of_node) {
@@ -368,25 +382,57 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 		u32 delays[3] = { 0, 0, 0 };
 
 		reset_gpio = devm_gpiod_get_optional(priv->device,
-						     "snps,reset",
-						     GPIOD_OUT_LOW);
-		if (IS_ERR(reset_gpio))
+					    "snps,reset",
+					    GPIOD_OUT_HIGH);
+		if (IS_ERR(reset_gpio)) {
+			dev_err(priv->device, "error reset GPIO is %d\n", PTR_ERR(reset_gpio));
 			return PTR_ERR(reset_gpio);
+		}
+
+		if (of_property_read_bool(priv->device->of_node, "snps,phy1_reset-gpio")) {
+			priv->plat->reset_phy1_gpio = devm_gpiod_get_optional(priv->device,
+									      "snps,phy1_reset",
+									      GPIOD_OUT_LOW);
+
+			if (IS_ERR(priv->plat->reset_phy1_gpio)) {
+				dev_err(priv->device, "error reset GPIO is %d\n",
+					PTR_ERR(priv->plat->reset_phy1_gpio));
+				return PTR_ERR(priv->plat->reset_phy1_gpio);
+			}
+		}
 
 		device_property_read_u32_array(priv->device,
 					       "snps,reset-delays-us",
 					       delays, ARRAY_SIZE(delays));
+		if (priv->plat->reset_phy1_gpio) {
+			if (priv->plat->interface == PHY_INTERFACE_MODE_SGMII ||
+			    priv->plat->interface == PHY_INTERFACE_MODE_USXGMII ||
+			    priv->plat->interface == PHY_INTERFACE_MODE_2500BASEX ||
+			    priv->plat->interface == PHY_INTERFACE_MODE_5GBASER) {
+				devm_gpiod_put(priv->device, reset_gpio);
+				reset_gpio = priv->plat->reset_phy1_gpio;
+				gpiod_set_value(reset_gpio, 1);
+
+				device_property_read_u32_array(priv->device,
+							       "snps,phy1-reset-delays-us",
+								delays, ARRAY_SIZE(delays));
+			} else {
+				gpiod_set_value(priv->plat->reset_phy1_gpio, 1);
+				devm_gpiod_put(priv->device, priv->plat->reset_phy1_gpio);
+			}
+		}
 
 		if (delays[0])
 			msleep(DIV_ROUND_UP(delays[0], 1000));
 
-		gpiod_set_value_cansleep(reset_gpio, active_high ? 1 : 0);
+		gpiod_set_value(reset_gpio, 1);
 		if (delays[1])
 			msleep(DIV_ROUND_UP(delays[1], 1000));
 
-		gpiod_set_value_cansleep(reset_gpio, active_high ? 0 : 1);
+		gpiod_set_value(reset_gpio, 0);
 		if (delays[2])
 			msleep(DIV_ROUND_UP(delays[2], 1000));
+		devm_gpiod_put(priv->device, reset_gpio);
 	}
 #endif
 
@@ -461,16 +507,29 @@ int stmmac_mdio_register(struct net_device *ndev)
 	if (mdio_bus_data->irqs)
 		memcpy(new_bus->irq, mdio_bus_data->irqs, sizeof(new_bus->irq));
 
-	new_bus->name = "stmmac";
+	if (priv->plat->port_num == 1)
+		new_bus->name = "stmmac_dev1";
+	else
+		new_bus->name = "stmmac_dev0";
 
-	if (priv->plat->has_gmac4) {
-		if (priv->plat->has_c22_mdio_probe_capability)
-			new_bus->probe_capabilities = MDIOBUS_C22;
-		else
-			new_bus->probe_capabilities = MDIOBUS_C22_C45;
-	}
+	if (priv->plat->has_c22_mdio_probe_capability)
+		new_bus->probe_capabilities = MDIOBUS_C22;
+	else if (priv->plat->has_c45_mdio_probe_capability)
+		new_bus->probe_capabilities = MDIOBUS_C45;
+	else
+		new_bus->probe_capabilities = MDIOBUS_C22_C45;
+
+	if (priv->plat->is_valid_eth_intf && priv->plat->interface ==  PHY_INTERFACE_MODE_RGMII)
+		new_bus->probe_capabilities = MDIOBUS_C22;
 
 	if (priv->plat->has_xgmac) {
+		if (priv->plat->is_valid_eth_intf &&
+		    (priv->plat->interface == PHY_INTERFACE_MODE_SGMII ||
+		     priv->plat->interface == PHY_INTERFACE_MODE_USXGMII ||
+		     priv->plat->interface == PHY_INTERFACE_MODE_2500BASEX ||
+		     priv->plat->interface == PHY_INTERFACE_MODE_5GBASER))
+			new_bus->probe_capabilities = MDIOBUS_C45;
+
 		new_bus->read = &stmmac_xgmac2_mdio_read;
 		new_bus->write = &stmmac_xgmac2_mdio_write;
 
@@ -481,6 +540,8 @@ int stmmac_mdio_register(struct net_device *ndev)
 		if (priv->plat->phy_addr > MII_XGMAC_MAX_C22ADDR)
 			dev_err(dev, "Unsupported phy_addr (max=%d)\n",
 					MII_XGMAC_MAX_C22ADDR);
+
+		init_completion(&priv->plat->mdio_op);
 	} else {
 		new_bus->read = &stmmac_mdio_read;
 		new_bus->write = &stmmac_mdio_write;
@@ -495,6 +556,9 @@ int stmmac_mdio_register(struct net_device *ndev)
 	new_bus->priv = ndev;
 	new_bus->phy_mask = mdio_bus_data->phy_mask;
 	new_bus->parent = priv->device;
+
+	if (priv->plat->phy_addr >= 0 && priv->plat->phy_addr < PHY_MAX_ADDR)
+		new_bus->phy_mask = ~(1 << priv->plat->phy_addr);
 
 	err = of_mdiobus_register(new_bus, mdio_node);
 	if (err == -ENODEV) {
@@ -538,6 +602,7 @@ int stmmac_mdio_register(struct net_device *ndev)
 		if (priv->plat->phy_addr == -1)
 			priv->plat->phy_addr = addr;
 
+		priv->phydev = phydev;
 		phy_attached_info(phydev);
 		found = 1;
 		dev_info(dev, "Successfully registered MDIO to PHY address %d\n", addr);
