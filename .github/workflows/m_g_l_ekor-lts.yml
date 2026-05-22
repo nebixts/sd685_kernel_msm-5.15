@@ -16,7 +16,7 @@ jobs:
       - name: Checkout local repository
         uses: actions/checkout@v4
         with:
-          ref: google
+          ref: google-2.0
           fetch-depth: 0 # Fetches full history for proper merge-base checks
 
       - name: Configure Git
