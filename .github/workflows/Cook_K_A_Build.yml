@@ -425,8 +425,9 @@ jobs:
       - name: "😎 Set args for GKI kernels"
         if: github.event.inputs.Toolchain == 'XCLANG'
         id: generate-args
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
+            TARGET_DIR="${{ github.workspace }}/${{ env.kernelDir }}/${{ env.kernelName }}"
+    
             args="-j$(nproc --all)"
             if [ -n "${{ env.OUT_DIR }}" ]; then
               mkdir -p $(pwd)/${{ env.OUT_DIR }}
@@ -436,15 +437,15 @@ jobs:
             args="$args ARCH=arm64 LLVM=1 LTO=thin"
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            
             args="$args KCFLAGS='-O3 -mllvm -polly -mllvm -polly-vectorizer=stripmine'"
             
             echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "😎 Set args for GKI kernels"
         if: github.event.inputs.Toolchain == 'LLVM'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
+            TARGET_DIR="${{ github.workspace }}/${{ env.kernelDir }}/${{ env.kernelName }}"
+    
             args="-j$(nproc --all)"
             if [ -n "${{ env.OUT_DIR }}" ]; then
               mkdir -p $(pwd)/${{ env.OUT_DIR }}
@@ -454,7 +455,6 @@ jobs:
             args="$args ARCH=arm64 LLVM=1 LTO=thin"
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            
             args="$args KCFLAGS='-O3 -flto=thin' KAFLAGS='-flto=thin' KBUILD_LDFLAGS='-flto=thin'"
             
             echo "args=$args" >> $GITHUB_OUTPUT
