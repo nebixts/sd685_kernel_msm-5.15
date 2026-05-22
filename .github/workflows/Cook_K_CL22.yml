@@ -17,9 +17,9 @@ on:
         description: "Kernel branch"
         required: false
         type: choice
-        default: "google"
+        default: "google-1.0"
         options:
-          - "google"
+          - "google-1.0"
           - "zepharo"
           - "codelinaro"
           - "topnotchfreaks"
@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-21052026"
+        default: "-NeFaRiaN-3.5-G-22052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -658,7 +658,7 @@ jobs:
           echo "📝 Configuring $CONFIG_FILE"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          CONFIG_KPM=y
+          CONFIG_KPM=n
           CONFIG_KPROBES=y
           CONFIG_HAVE_KPROBES=y
           CONFIG_KPROBE_EVENTS=y
