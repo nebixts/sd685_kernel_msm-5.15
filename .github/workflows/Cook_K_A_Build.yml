@@ -424,6 +424,7 @@ jobs:
             sudo sysctl -p
 
       - name: "😎 Set args for GKI kernels"
+        if: github.event.inputs.Toolchain == 'XCLANG'
         id: generate-args
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -1066,6 +1067,7 @@ jobs:
           echo "✅ Installed RESUKISU with SUSFS Successfully"
                   
       - name: "👍 Make defconfig"
+        if: github.event.inputs.Toolchain == 'XCLANG'
         run: |
           TC_DIR="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
           
@@ -1077,7 +1079,18 @@ jobs:
 
       # ====================== Begin Processing Build Kernel Stage ======================
     
+      - name: "🔨 START Build Kernel"
+        if: github.event.inputs.Toolchain == 'ACLANG'
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+           LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          else
+           LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          fi
+      
       - name: "🛠️ Start Build Kernel 🪛"
+        if: github.event.inputs.Toolchain == 'XCLANG'
         run: |
           export TOOLCHAIN_PATH="$GITHUB_WORKSPACE/prebuilts/clang/host/linux-x86/xclang-22.1.2"
           export PATH="$TOOLCHAIN_PATH/bin:$PATH"
