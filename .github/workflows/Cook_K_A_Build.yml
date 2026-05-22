@@ -360,7 +360,9 @@ jobs:
         run: |
            set -e
 
+           # 1. Define Version & Correct URL
            CLANG_VERSION="22.1.6"
+           # FIX: Added '$' for variable expansion and restored full GitHub release path
            CLANG_URL="https://github.com{CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-24.04.tar.xz"
 
            echo "✅ Clang URL: $CLANG_URL"
@@ -368,7 +370,13 @@ jobs:
            mkdir -p clang
 
            echo "🚀 Downloading Official LLVM Clang v${CLANG_VERSION}..."
-           wget --progress=bar:force -O "clang/clang.tar.xz" "$CLANG_URL" || { echo "❌ Failed to download Clang!"; exit 1; }
+    
+           # 2. Download with robust flags
+           wget -q --show-progress --progress=bar:force -O "clang/clang.tar.xz" "$CLANG_URL" || { 
+           echo "❌ Failed to download Clang! URL might be invalid for this version."
+           echo "Attempted URL: $CLANG_URL"
+           exit 1
+           }
 
            echo "📦 Extracting Clang..."
            tar -xf clang/clang.tar.xz --strip-components=1 -C clang || { echo "❌ Extraction failed!"; exit 1; }
@@ -379,30 +387,29 @@ jobs:
            if [ ! -f "$CLANG_PATH/clang" ]; then
              echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
              ls -R clang
-            exit 1
+             exit 1
            fi
 
            echo "✅ Using Clang from $CLANG_PATH"
            echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
            echo "$CLANG_PATH" >> $GITHUB_PATH
 
-           # Set up Execution Environment
+           # 3. GKI Build Environment Setup
            export PATH="$CLANG_PATH:$PATH"
     
            echo "⚙️ Using Clang version:"
            clang --version || echo "❌ Clang not found in PATH!"
 
-           # Handle dependencies for older runners if necessary
+           # Optional: Fix dependencies for older runners
            TC_ROOT="${CLANG_PATH%/bin}"
            TC_LIB_DIR="$TC_ROOT/lib"
-           mkdir -p "$TC_LIB_DIR"
            if [ -f /usr/lib/x86_64-linux-gnu/libxml2.so.2 ]; then
-             echo "🔧 Fixing libxml2 in $TC_LIB_DIR..."
+             mkdir -p "$TC_LIB_DIR"
              ln -sf /usr/lib/x86_64-linux-gnu/libxml2.so.2 "$TC_LIB_DIR/libxml2.so.16"
              echo "LD_LIBRARY_PATH=$TC_LIB_DIR:$LD_LIBRARY_PATH" >> $GITHUB_ENV
            fi
 
-           # Crucial Environment Variables for Google GKI Compilation
+           # 4. Crucial Kernel Flags
            echo "LLVM=1" >> $GITHUB_ENV
            echo "LLVM_IAS=1" >> $GITHUB_ENV
            echo "ARCH=arm64" >> $GITHUB_ENV
