@@ -363,7 +363,7 @@ jobs:
            # 1. Define Version & Correct URL
            CLANG_VERSION="22.1.6"
            # FIX: Added '$' for variable expansion and restored full GitHub release path
-           CLANG_URL="https://github.com{CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-24.04.tar.xz"
+           CLANG_URL="https://github.com/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-24.04.tar.xz"
 
            echo "✅ Clang URL: $CLANG_URL"
 
