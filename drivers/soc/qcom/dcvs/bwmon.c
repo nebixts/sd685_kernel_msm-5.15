@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "qcom-bwmon: " fmt
@@ -851,13 +851,13 @@ static int update_bw_hwmon(struct bw_hwmon *hw)
 static int start_monitor(struct bw_hwmon *hwmon)
 {
 	struct hwmon_node *node = hwmon->node;
-	unsigned long mbps;
+	u64 mbps;
 	int ret;
 
 	node->prev_ts = ktime_get();
 	node->prev_ab = 0;
-	mbps = KHZ_TO_MBPS(node->cur_freqs[0].ib, hwmon->dcvs_width) *
-					node->io_percent / 100;
+	mbps = KHZ_TO_MBPS(node->cur_freqs[0].ib, hwmon->dcvs_width) * node->io_percent;
+	do_div(mbps, 100);
 	hwmon->up_wake_mbps = mbps;
 	hwmon->down_wake_mbps = MIN_MBPS;
 	ret = hwmon->start_hwmon(hwmon, mbps);

@@ -30,6 +30,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
 #include <linux/icmp.h>
+#include <linux/gunyah/gh_rm_drv.h>
 
 struct stmmac_resources {
 	void __iomem *addr;
@@ -59,8 +60,12 @@ struct stmmac_tx_info {
 	enum stmmac_txbuf_type buf_type;
 };
 
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+#define STMMAC_MAX_PID		1023
+#endif
 #define STMMAC_TBS_AVAIL	BIT(0)
 #define STMMAC_TBS_EN		BIT(1)
+#define AUX_TS_CHANNEL		1
 
 /* Frequently used values are kept adjacent for cache effect */
 struct stmmac_tx_queue {
@@ -84,6 +89,15 @@ struct stmmac_tx_queue {
 	dma_addr_t dma_tx_phy;
 	dma_addr_t tx_tail_addr;
 	u32 mss;
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+	u32 pid;
+#endif
+#ifdef DMA_OFFLOAD_ENABLE
+	struct sk_buff **tx_offload_skbuff;
+	dma_addr_t *tx_offload_skbuff_dma;
+	dma_addr_t buff_tx_phy;
+	void *buffer_tx_va_addr;
+#endif
 };
 
 struct stmmac_rx_buffer {
@@ -121,6 +135,12 @@ struct stmmac_rx_queue {
 		unsigned int len;
 		unsigned int error;
 	} state;
+#ifdef DMA_OFFLOAD_ENABLE
+	struct sk_buff **rx_offload_skbuff;
+	dma_addr_t *rx_offload_skbuff_dma;
+	dma_addr_t buff_rx_phy;
+	void *buffer_rx_va_addr;
+#endif
 };
 
 struct stmmac_channel {
@@ -196,6 +216,78 @@ struct stmmac_rfs_entry {
 	int tc;
 };
 
+struct l4_filter_info {
+	u8 l4_proto_number;
+	u16 src_port;
+	u16 dest_port;
+};
+
+struct l3_l4_ipv4_filter {
+	u32 src_addr;
+	u8 src_addr_mask;
+	u32 dest_addr;
+	u8 dest_addr_mask;
+	struct l4_filter_info l4_filter;
+};
+
+struct l3_l4_ipv6_filter {
+	bool src_or_dest_ip;
+	unsigned char src_or_dest_addr[16];
+	unsigned char src_or_dest_addr_mask;
+	struct l4_filter_info l4_filter;
+};
+
+enum ptp_l4_dst_port {
+	PTP_UDP_PORT1 = 319,
+	PTP_UDP_PORT2 = 320,
+};
+
+enum idx_action {
+	IDX_UNUSED,
+	IDX_USED,
+	IDX_CLEAR,
+};
+
+enum ip_protocol {
+	IP_PROTO_TCP = 0,
+	IP_PROTO_UDP = 1,
+	IP_PROTO_TCP_UDP = 2,
+	IP_INVALID_PROTO = 3
+};
+
+struct src_ip_addr {
+	unsigned char ipv6_src_addr[16];
+	u32 ipv4_src_addr;
+	u8 src_mask_length;
+	bool ipv6_src;
+};
+
+struct dest_ip_addr {
+	unsigned char ipv6_dst_addr[16];
+	u32 ipv4_dst_addr;
+	u8 dst_mask_length;
+	bool ipv6_dst;
+};
+
+struct ip_port {
+	u32 port_num;
+	enum ip_protocol proto;
+};
+
+struct dma_flt {
+	enum idx_action action;
+	u8 dma_ch;
+
+	union  {
+		u16 vlan_id;
+		struct src_ip_addr ip_src;
+		struct dest_ip_addr ip_dest;
+
+		struct ip_port src_port;
+		struct ip_port dst_port;
+	};
+};
+
 struct stmmac_priv {
 	/* Frequently used values are kept adjacent for cache effect */
 	u32 tx_coal_frames[MTL_MAX_TX_QUEUES];
@@ -205,12 +297,12 @@ struct stmmac_priv {
 
 	int tx_coalesce;
 	int hwts_tx_en;
-	int irq_number;
 	bool tx_path_in_lpi_mode;
 	bool tso;
 	int sph;
 	int sph_cap;
 	u32 sarc_type;
+	unsigned int aux_ts_num_pins;
 
 	unsigned int dma_buf_sz;
 	unsigned int rx_copybreak;
@@ -299,9 +391,10 @@ struct stmmac_priv {
 	char int_name_tx_irq[MTL_MAX_TX_QUEUES][IFNAMSIZ + 18];
 
 	bool boot_kpi;
-	bool early_eth;
 	bool early_eth_config_set;
 	int current_loopback;
+	int loopback_direction;
+	int phylink_disconnected;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dbgfs_dir;
 #endif
@@ -338,7 +431,31 @@ struct stmmac_priv {
 	struct bpf_prog *xdp_prog;
 
 	bool phy_irq_enabled;
+	bool wol_irq_enabled;
 	bool en_wol;
+	u32 avb_vlan_id;
+	gh_vmid_t v2x_vm_id;
+	u16 qos_l3_l4_filter_end;
+	int unique_filter_new;
+	int unique_filter_old;
+	int max_filters_new;
+	int max_filters_old;
+	int app_l3_l4_filters;
+	u16 qos_l3_l4_filters;
+	bool queue_dis[MTL_MAX_RX_QUEUES];
+	struct dma_flt app_filters[32];
+	bool is_rx_sw[MTL_MAX_RX_QUEUES];
+	bool is_tx_sw[MTL_MAX_TX_QUEUES];
+	u8 queue_pcp_map[MTL_MAX_RX_QUEUES];
+	u32 tx_ch_bw[MTL_MAX_TX_QUEUES];
+	u8 tx_queue_pcp_map[MTL_MAX_TX_QUEUES];
+
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(adv_old);
+
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+	bool ptp_init;
+#endif
+	struct completion probe_done;
 };
 
 enum stmmac_state {
@@ -368,12 +485,20 @@ int stmmac_dvr_remove(struct device *dev);
 int stmmac_dvr_probe(struct device *device,
 		     struct plat_stmmacenet_data *plat_dat,
 		     struct stmmac_resources *res);
+void stmmac_tx_err(struct stmmac_priv *priv, u32 chan);
+int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue);
 void stmmac_disable_eee_mode(struct stmmac_priv *priv);
 bool stmmac_eee_init(struct stmmac_priv *priv);
 int stmmac_reinit_queues(struct net_device *dev, u32 rx_cnt, u32 tx_cnt);
 int stmmac_reinit_ringparam(struct net_device *dev, u32 rx_size, u32 tx_size);
 int stmmac_bus_clks_config(struct stmmac_priv *priv, bool enabled);
 void stmmac_fpe_handshake(struct stmmac_priv *priv, bool enable);
+int stmmac_release_dma_resources(struct net_device *ndev);
+int stmmac_request_dma_resources(struct net_device *ndev, u32 queue_cnt);
+void stmmac_mac_config_pfc(struct stmmac_priv *priv);
+void stmmac_pfc_tx_flow_ctrl(struct stmmac_priv *priv, u32 queue);
+int stmmac_config_rx_queue(struct net_device *ndev, u32 queue, bool skip_sw);
+int stmmac_config_tx_queue(struct net_device *ndev, u32 queue, bool skip_sw);
 
 static inline bool stmmac_xdp_is_enabled(struct stmmac_priv *priv)
 {
@@ -388,6 +513,7 @@ static inline unsigned int stmmac_rx_offset(struct stmmac_priv *priv)
 	return 0;
 }
 
+int stmmac_phy_setup(struct stmmac_priv *priv);
 void stmmac_disable_rx_queue(struct stmmac_priv *priv, u32 queue);
 void stmmac_enable_rx_queue(struct stmmac_priv *priv, u32 queue);
 void stmmac_disable_tx_queue(struct stmmac_priv *priv, u32 queue);
@@ -400,7 +526,8 @@ struct timespec64 stmmac_calc_tas_basetime(ktime_t old_base_time,
 					   ktime_t current_time,
 					   u64 cycle_time);
 void stmmac_mac2mac_adjust_link(int speed, struct stmmac_priv *priv);
-
+void qcom_serdes_loopback_v3_1(struct plat_stmmacenet_data *plat, bool on);
+void stmmac_set_speed100(struct stmmac_priv *priv);
 #if IS_ENABLED(CONFIG_STMMAC_SELFTESTS)
 void stmmac_selftest_run(struct net_device *dev,
 			 struct ethtool_test *etest, u64 *buf);

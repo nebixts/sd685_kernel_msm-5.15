@@ -162,6 +162,35 @@ config POWER_RESET_QCOM_REBOOT_REASON
           to boot the MSM board to fastboot mode.
           If unsure, say Y.
 
+config POWER_RESET_QCOM_RESET_REASON
+	bool "MSM reset resaons operations"
+	depends on ARCH_QCOM
+	depends on POWER_RESET_QCOM_REBOOT_REASON
+	help
+	  This feature is enabled when reboot reason is needed in the
+	  userspace. Sysfs path /sys/kernel/reset_reason/reset_reason
+	  is used to indicate the state of the last reset reason
+	  set as part of system restart.
+	  If unsure, say N.
+
+config POWER_RESET_QCOM_REBOOT_REASON_BOOTPARAM
+	bool "MSM reboot reason boot parameter"
+	depends on POWER_RESET_QCOM_REBOOT_REASON
+	help
+	  This feature adds a command line parameter 'qcom-reboot-reason.reason'
+	  which can be used to pass the reboot reason on bootup. This allows
+	  the driver to access the reboot reason on targets where the bootloader
+	  clears the reason after reading it.
+
+config POWER_RESET_QCOM_DOWNLOAD_MODE_COMPRESS
+	bool "MSM compression support for fulldump"
+	depends on ARCH_QCOM
+	help
+	  This feature is enabled when compression is required for
+	  collection of fulldump when the storage attribute is set
+	  to emmc_dload.
+	  Say Y here to enable "compression" by default.
+
 config POWER_RESET_OCELOT_RESET
 	bool "Microsemi Ocelot reset driver"
 	depends on MSCC_OCELOT || ARCH_SPARX5 || COMPILE_TEST

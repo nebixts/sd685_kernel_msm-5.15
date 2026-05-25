@@ -923,6 +923,12 @@ static int adc_tm5_gen3_set_trip_temp(void *data,
 	if (!prop)
 		return -EINVAL;
 
+	if (prop->tzd && prop->tzd->emul_temperature) {
+		pr_debug("%s: %s emul_temp is enabled[%d], ignoring setting trip\n",
+			__func__, prop->tzd->type, prop->tzd->emul_temperature);
+		return 0;
+	}
+
 	pr_debug("channel:%s :low_temp(mdegC):%d, high_temp(mdegC):%d\n",
 		prop->datasheet_name, low_temp, high_temp);
 
@@ -1408,6 +1414,10 @@ static const struct adc5_channels adc5_chans_pmic[ADC5_MAX_CHANNEL] = {
 						SCALE_HW_CALIB_DEFAULT)
 	[ADC5_GEN3_AMUX3_THM]		= ADC5_CHAN_TEMP("smb_temp", 9,
 						SCALE_HW_CALIB_PM7_SMB_TEMP)
+	[ADC5_GEN3_AMUX5_THM]		= ADC5_CHAN_VOLT("amux5", 0,
+						SCALE_HW_CALIB_DEFAULT)
+	[ADC5_GEN3_AMUX6_THM]		= ADC5_CHAN_VOLT("amux6", 0,
+						SCALE_HW_CALIB_DEFAULT)
 	[ADC5_GEN3_CHG_TEMP]		= ADC5_CHAN_TEMP("chg_temp", 0,
 						SCALE_HW_CALIB_PM7_CHG_TEMP)
 	[ADC5_GEN3_USB_SNS_V_16]	= ADC5_CHAN_TEMP("usb_sns_v_div_16", 8,

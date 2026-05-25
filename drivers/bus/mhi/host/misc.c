@@ -324,7 +324,7 @@ int mhi_misc_register_controller(struct mhi_controller *mhi_cntrl)
 						    PCI_SLOT(parent->devfn));
 	}
 
-	mhi_priv->log_buf = ipc_log_context_create(MHI_IPC_LOG_PAGES,
+	mhi_priv->log_buf = ipc_log_context_create(CONFIG_MHI_BUS_LOG_PAGES,
 						   mhi_dev->name, 0);
 	if (!mhi_priv->log_buf)
 		MHI_ERR(dev, "Failed to create MHI IPC logs\n");
@@ -437,7 +437,8 @@ static struct mhi_controller *find_mhi_controller_by_name(const char *name)
 	list_for_each_entry_safe(mhi_priv, tmp_priv, &mhi_bus.controller_list,
 				 node) {
 		mhi_cntrl = mhi_priv->mhi_cntrl;
-		if (mhi_cntrl->mhi_dev->name && (!strcmp(name, mhi_cntrl->mhi_dev->name)))
+		if (mhi_cntrl->mhi_dev && mhi_cntrl->mhi_dev->name
+				&& (!strcmp(name, mhi_cntrl->mhi_dev->name)))
 			return mhi_cntrl;
 	}
 

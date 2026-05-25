@@ -17,6 +17,7 @@
 #include <linux/kthread.h>
 #include <linux/mhi.h>
 #include <linux/mhi_misc.h>
+#include <linux/etherdevice.h>
 
 #define MHI_NETDEV_DRIVER_NAME "mhi_netdev"
 #define WATCHDOG_TIMEOUT (30 * HZ)
@@ -81,6 +82,7 @@ struct mhi_netdev {
 	int pool_size;
 	bool chain_skb;
 	struct mhi_net_chain *chain;
+	bool ethernet_interface;
 
 	struct task_struct *alloc_task;
 	wait_queue_head_t alloc_event;
@@ -122,6 +124,7 @@ struct mhi_netdev_driver_data {
 	bool is_rsc_chan;
 	bool has_rsc_child;
 	const char *interface_name;
+	bool ethernet_interface;
 };
 
 static struct mhi_netdev *rsc_parent_netdev;
@@ -277,8 +280,38 @@ static int mhi_netdev_queue_bg_pool(struct mhi_netdev *mhi_netdev,
 	return i;
 }
 
-static void mhi_netdev_queue(struct mhi_netdev *mhi_netdev,
-			     struct mhi_device *mhi_dev)
+static void mhi_netdev_queue_skb(struct mhi_netdev *mhi_netdev,
+				struct mhi_device *mhi_dev)
+{
+	struct net_device *ndev = mhi_netdev->ndev;
+	struct sk_buff *skb;
+	int nr_tre = mhi_get_free_desc_count(mhi_dev, DMA_FROM_DEVICE);
+	int i, size, err;
+
+	MSG_VERB("Enter free descriptors: %d\n", nr_tre);
+	if (!nr_tre)
+		return;
+
+	size = mhi_dev->mhi_cntrl->buffer_len;
+
+	for (i = 0; i < nr_tre; i++) {
+		skb = netdev_alloc_skb(ndev, size);
+		if (unlikely(!skb))
+			break;
+
+		skb->dev = ndev;
+		err = mhi_queue_skb(mhi_dev, DMA_FROM_DEVICE, skb, size, MHI_EOT);
+		if (unlikely(err)) {
+			net_err_ratelimited("%s: Failed to queue RX buf (%d)\n",
+					ndev->name, err);
+			kfree_skb(skb);
+			break;
+		}
+	}
+}
+
+static void mhi_netdev_queue_dma(struct mhi_netdev *mhi_netdev,
+				struct mhi_device *mhi_dev)
 {
 	struct device *dev = mhi_dev->dev.parent->parent;
 	struct mhi_netbuf *netbuf, *temp_buf;
@@ -496,11 +529,14 @@ static int mhi_netdev_poll(struct napi_struct *napi, int budget)
 		return 0;
 	}
 
-	/* queue new buffers */
-	mhi_netdev_queue(mhi_netdev, mhi_dev);
+	/* queue new buffers based on interface*/
+	if (mhi_netdev->ethernet_interface)
+		mhi_netdev_queue_skb(mhi_netdev, mhi_dev);
+	else
+		mhi_netdev_queue_dma(mhi_netdev, mhi_dev);
 
 	if (rsc_dev)
-		mhi_netdev_queue(mhi_netdev, rsc_dev->mhi_dev);
+		mhi_netdev_queue_dma(mhi_netdev, rsc_dev->mhi_dev);
 
 	/* complete work if # of packet processed less than allocated budget */
 	if (rx_work < budget) {
@@ -677,6 +713,14 @@ static void mhi_netdev_setup(struct net_device *dev)
 	dev->watchdog_timeo = WATCHDOG_TIMEOUT;
 }
 
+static void mhi_netdev_ether_setup(struct net_device *dev)
+{
+	dev->netdev_ops = &mhi_netdev_ops_ip;
+	ether_setup(dev);
+	dev->max_mtu = ETH_MAX_MTU;
+	dev->min_mtu = ETH_MIN_MTU;
+}
+
 /* enable mhi_netdev netdev, call only after grabbing mhi_netdev.mutex */
 static int mhi_netdev_enable_iface(struct mhi_netdev *mhi_netdev)
 {
@@ -690,10 +734,19 @@ static int mhi_netdev_enable_iface(struct mhi_netdev *mhi_netdev)
 	rtnl_lock();
 	mhi_netdev->ndev = alloc_netdev(sizeof(*mhi_netdev_priv),
 					ifname, NET_NAME_PREDICTABLE,
+					mhi_netdev->ethernet_interface ?
+					mhi_netdev_ether_setup :
 					mhi_netdev_setup);
+
 	if (!mhi_netdev->ndev) {
 		rtnl_unlock();
 		return -ENOMEM;
+	}
+
+	if (mhi_netdev->ethernet_interface) {
+		eth_random_addr(mhi_netdev->ndev->dev_addr);
+		if (!is_valid_ether_addr(mhi_netdev->ndev->dev_addr))
+			return -EADDRNOTAVAIL;
 	}
 
 	mhi_netdev->ndev->mtu = mhi_dev->mhi_cntrl->buffer_len;
@@ -772,10 +825,31 @@ static void mhi_netdev_push_skb(struct mhi_netdev *mhi_netdev,
 	netif_receive_skb(skb);
 }
 
-static void mhi_netdev_xfer_dl_cb(struct mhi_device *mhi_dev,
-				  struct mhi_result *mhi_result)
+static void mhi_netdev_xfer_dl_cb_eth(struct mhi_device *mhi_dev,
+				struct mhi_result *mhi_result,
+				struct mhi_netdev *mhi_netdev)
 {
-	struct mhi_netdev *mhi_netdev = dev_get_drvdata(&mhi_dev->dev);
+	struct sk_buff *skb;
+	struct net_device *ndev = mhi_netdev->ndev;
+
+	/* modem is down, drop the buffer */
+	if (mhi_result->transaction_status == -ENOTCONN)
+		return;
+
+	ndev->stats.rx_packets++;
+	ndev->stats.rx_bytes += mhi_result->bytes_xferd;
+
+	skb = mhi_result->buf_addr;
+	skb_put(skb, mhi_result->bytes_xferd);
+	skb->protocol = eth_type_trans(skb, mhi_netdev->ndev);
+
+	netif_receive_skb(skb);
+}
+
+static void mhi_netdev_xfer_dl_cb_rawip(struct mhi_device *mhi_dev,
+					struct mhi_result *mhi_result,
+					struct mhi_netdev *mhi_netdev)
+{
 	struct mhi_netbuf *netbuf = mhi_result->buf_addr;
 	struct mhi_buf *mhi_buf = &netbuf->mhi_buf;
 	struct sk_buff *skb;
@@ -820,6 +894,17 @@ static void mhi_netdev_xfer_dl_cb(struct mhi_device *mhi_dev,
 	} else {
 		__free_pages(netbuf->page, mhi_netdev->order);
 	}
+}
+
+static void mhi_netdev_xfer_dl_cb(struct mhi_device *mhi_dev,
+				struct mhi_result *mhi_result)
+{
+	struct mhi_netdev *mhi_netdev = dev_get_drvdata(&mhi_dev->dev);
+
+	if (mhi_netdev->ethernet_interface)
+		mhi_netdev_xfer_dl_cb_eth(mhi_dev, mhi_result, mhi_netdev);
+	else
+		mhi_netdev_xfer_dl_cb_rawip(mhi_dev, mhi_result, mhi_netdev);
 }
 
 static void mhi_netdev_status_cb(struct mhi_device *mhi_dev,
@@ -909,6 +994,11 @@ static void mhi_netdev_create_debugfs_dir(void)
 	dentry = debugfs_create_dir(MHI_NETDEV_DRIVER_NAME, 0);
 }
 
+static void mhi_netdev_debugfs_remove(void)
+{
+	debugfs_remove_recursive(dentry);
+}
+
 #else
 
 static void mhi_netdev_create_debugfs(struct mhi_netdev *mhi_netdev)
@@ -916,6 +1006,10 @@ static void mhi_netdev_create_debugfs(struct mhi_netdev *mhi_netdev)
 }
 
 static void mhi_netdev_create_debugfs_dir(void)
+{
+}
+
+static void mhi_netdev_debugfs_remove(void)
 {
 }
 
@@ -981,14 +1075,17 @@ static void mhi_netdev_remove(struct mhi_device *mhi_dev)
 
 	MSG_LOG("Remove notification received\n");
 
-	/* rsc parent takes cares of the cleanup except buffer pool */
+	/* rsc parent takes cares of the device cleanup except buffer pool.
+	 * buffer pool is cleaned as part of rsc child cleanup.
+	 */
 	if (mhi_netdev->is_rsc_dev) {
 		mhi_netdev_free_pool(mhi_netdev);
 		return;
 	}
 
 	sysfs_remove_group(&mhi_dev->dev.kobj, &mhi_netdev_group);
-	kthread_stop(mhi_netdev->alloc_task);
+	if (!mhi_netdev->ethernet_interface)
+		kthread_stop(mhi_netdev->alloc_task);
 	netif_stop_queue(mhi_netdev->ndev);
 	napi_disable(mhi_netdev->napi);
 	unregister_netdev(mhi_netdev->ndev);
@@ -999,7 +1096,10 @@ static void mhi_netdev_remove(struct mhi_device *mhi_dev)
 	if (!IS_ERR_OR_NULL(mhi_netdev->dentry))
 		debugfs_remove_recursive(mhi_netdev->dentry);
 
-	if (!mhi_netdev->rsc_parent)
+	/* For non rsc-channels, we need to explicitly clean the
+	 *  buffer pool.
+	 */
+	if (!mhi_netdev->ethernet_interface && !mhi_netdev->rsc_parent)
 		mhi_netdev_free_pool(mhi_netdev);
 }
 
@@ -1017,13 +1117,59 @@ static void mhi_netdev_clone_dev(struct mhi_netdev *mhi_netdev,
 	mhi_netdev->bg_pool = parent->bg_pool;
 }
 
+static int mhi_netdev_setup_dma(struct mhi_netdev *mhi_netdev,
+				struct mhi_netdev_driver_data *data)
+{
+	struct mhi_device *mhi_dev = mhi_netdev->mhi_dev;
+	int nr_tre, ret;
+
+	/* setup pool size ~2x ring length*/
+	nr_tre = mhi_get_free_desc_count(mhi_dev, DMA_FROM_DEVICE);
+	mhi_netdev->pool_size = 1 << __ilog2_u32(nr_tre);
+
+	if (nr_tre > mhi_netdev->pool_size)
+		mhi_netdev->pool_size <<= 1;
+
+	mhi_netdev->pool_size <<= 1;
+
+	/* if we expect child device to share then double the pool */
+	if (data->has_rsc_child)
+		mhi_netdev->pool_size <<= 1;
+
+	/* allocate memory pool */
+	ret = mhi_netdev_alloc_pool(mhi_netdev);
+	if (ret)
+		return -ENOMEM;
+
+	/* create a background task to allocate memory */
+	mhi_netdev->bg_pool = kmalloc(sizeof(*mhi_netdev->bg_pool),
+							GFP_KERNEL);
+	if (!mhi_netdev->bg_pool)
+		return -ENOMEM;
+
+	init_waitqueue_head(&mhi_netdev->alloc_event);
+	INIT_LIST_HEAD(mhi_netdev->bg_pool);
+	spin_lock_init(&mhi_netdev->bg_lock);
+	mhi_netdev->bg_pool_limit = mhi_netdev->pool_size / 4;
+	mhi_netdev->alloc_task = kthread_run(mhi_netdev_alloc_thread,
+						mhi_netdev,
+						mhi_netdev->ndev->name);
+
+	if (IS_ERR(mhi_netdev->alloc_task))
+		return PTR_ERR(mhi_netdev->alloc_task);
+
+	rsc_parent_netdev = mhi_netdev;
+
+	return 0;
+}
+
 static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 			    const struct mhi_device_id *id)
 {
 	struct mhi_netdev *mhi_netdev;
 	struct mhi_netdev_driver_data *data;
 	char node_name[40];
-	int nr_tre, ret;
+	int ret;
 
 	data = (struct mhi_netdev_driver_data *)id->driver_data;
 
@@ -1045,6 +1191,7 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 	mhi_netdev->mru = data->mru;
 	mhi_netdev->rsc_parent = data->has_rsc_child ? mhi_netdev : NULL;
 	mhi_netdev->rsc_dev = data->is_rsc_chan ? mhi_netdev : NULL;
+	mhi_netdev->ethernet_interface = data->ethernet_interface;
 
 	/* MRU must be multiplication of page size */
 	mhi_netdev->order = __ilog2_u32(mhi_netdev->mru / PAGE_SIZE);
@@ -1083,47 +1230,21 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 		if (ret)
 			return ret;
 
-		/* setup pool size ~2x ring length*/
-		nr_tre = mhi_get_free_desc_count(mhi_dev, DMA_FROM_DEVICE);
-		mhi_netdev->pool_size = 1 << __ilog2_u32(nr_tre);
-		if (nr_tre > mhi_netdev->pool_size)
-			mhi_netdev->pool_size <<= 1;
-		mhi_netdev->pool_size <<= 1;
+		if (!mhi_netdev->ethernet_interface) {
+			ret = mhi_netdev_setup_dma(mhi_netdev, data);
+			if (ret)
+				return ret;
+		}
 
-		/* if we expect child device to share then double the pool */
-		if (data->has_rsc_child)
-			mhi_netdev->pool_size <<= 1;
+		if (!mhi_netdev->ipc_log) {
+			/* create ipc log buffer */
+			snprintf(node_name, sizeof(node_name),
+				 "%s_%s", dev_name(&mhi_dev->dev),
+				 mhi_netdev->interface_name);
 
-		/* allocate memory pool */
-		ret = mhi_netdev_alloc_pool(mhi_netdev);
-		if (ret)
-			return -ENOMEM;
-
-		/* create a background task to allocate memory */
-		mhi_netdev->bg_pool = kmalloc(sizeof(*mhi_netdev->bg_pool),
-					      GFP_KERNEL);
-		if (!mhi_netdev->bg_pool)
-			return -ENOMEM;
-
-		init_waitqueue_head(&mhi_netdev->alloc_event);
-		INIT_LIST_HEAD(mhi_netdev->bg_pool);
-		spin_lock_init(&mhi_netdev->bg_lock);
-		mhi_netdev->bg_pool_limit = mhi_netdev->pool_size / 4;
-		mhi_netdev->alloc_task = kthread_run(mhi_netdev_alloc_thread,
-						     mhi_netdev,
-						     mhi_netdev->ndev->name);
-		if (IS_ERR(mhi_netdev->alloc_task))
-			return PTR_ERR(mhi_netdev->alloc_task);
-
-		rsc_parent_netdev = mhi_netdev;
-
-		/* create ipc log buffer */
-		snprintf(node_name, sizeof(node_name),
-			 "%s_%s", dev_name(&mhi_dev->dev),
-			 mhi_netdev->interface_name);
-
-		mhi_netdev->ipc_log = ipc_log_context_create(IPC_LOG_PAGES,
-							     node_name, 0);
+			mhi_netdev->ipc_log = ipc_log_context_create(IPC_LOG_PAGES,
+								     node_name, 0);
+		}
 
 		mhi_netdev_create_debugfs(mhi_netdev);
 	}
@@ -1143,14 +1264,16 @@ static const struct mhi_netdev_driver_data hw0_308_data = {
 	.is_rsc_chan = false,
 	.has_rsc_child = true,
 	.interface_name = "rmnet_mhi",
+	.ethernet_interface = false,
 };
 
-static const struct mhi_netdev_driver_data sw0_308_data = {
+static const struct mhi_netdev_driver_data hw1_308_data = {
 	.mru = 0x4000,
 	.chain_skb = false,
 	.is_rsc_chan = false,
 	.has_rsc_child = false,
 	.interface_name = "mhi_swip",
+	.ethernet_interface = false,
 };
 
 static const struct mhi_netdev_driver_data hw0_rsc_308_data = {
@@ -1159,12 +1282,32 @@ static const struct mhi_netdev_driver_data hw0_rsc_308_data = {
 	.is_rsc_chan = true,
 	.has_rsc_child = false,
 	.interface_name = "rmnet_mhi",
+	.ethernet_interface = false,
+};
+static const struct mhi_netdev_driver_data sw1_30a_data = {
+	.mru = 0x4000,
+	.chain_skb = false,
+	.is_rsc_chan = false,
+	.has_rsc_child = false,
+	.interface_name = "mhi_swip",
+	.ethernet_interface = true,
+};
+
+static const struct mhi_netdev_driver_data hw1_30a_data = {
+	.mru = 0x4000,
+	.chain_skb = false,
+	.is_rsc_chan = false,
+	.has_rsc_child = false,
+	.interface_name = "mhi_eth",
+	.ethernet_interface = true,
 };
 
 static const struct mhi_device_id mhi_netdev_match_table[] = {
 	{ .chan = "IP_HW0", .driver_data = (kernel_ulong_t)&hw0_308_data },
+	{ .chan = "IP_HW1", .driver_data = (kernel_ulong_t)&hw1_30a_data },
 	{ .chan = "IP_HW0_RSC", .driver_data = (kernel_ulong_t)&hw0_rsc_308_data },
-	{ .chan = "IP_SW0", .driver_data = (kernel_ulong_t)&sw0_308_data },
+	{ .chan = "IP_SW0", .driver_data = (kernel_ulong_t)&hw1_308_data },
+	{ .chan = "IP_SW1", .driver_data = (kernel_ulong_t)&sw1_30a_data },
 	{},
 };
 
@@ -1192,8 +1335,7 @@ module_init(mhi_netdev_init);
 
 static void __exit mhi_netdev_exit(void)
 {
-	debugfs_remove_recursive(dentry);
-
+	mhi_netdev_debugfs_remove();
 	mhi_driver_unregister(&mhi_netdev_driver);
 }
 module_exit(mhi_netdev_exit);

@@ -2759,9 +2759,8 @@ enum nl80211_commands {
  * @NL80211_ATTR_MLO_SUPPORT: Flag attribute to indicate user space supports MLO
  *	connection. Used with %NL80211_CMD_CONNECT. If this attribute is not
  *	included in NL80211_CMD_CONNECT drivers must not perform MLO connection.
- *
- * @NL80211_ATTR_EML_CAPABILITY: EML Capability information (u16)
- * @NL80211_ATTR_MLD_CAPA_AND_OPS: MLD Capabilities and Operations (u16)
+ * @NL80211_ATTR_TD_BITMAP: Transition Disable bitmap, for subsequent
+ *	(re)associations.
  *
  * @NL80211_ATTR_TX_HW_TIMESTAMP: Hardware timestamp for TX operation in
  *	nanoseconds (u64). This is the device clock timestamp so it will
@@ -2778,6 +2777,12 @@ enum nl80211_commands {
  * @NL80211_ATTR_TD_BITMAP: Transition Disable bitmap, for subsequent
  *	(re)associations.
  *
+ * @NL80211_ATTR_MLD_MAC: MLD MAC address
+ * @NL80211_ATTR_MLD_REFERENCE: MLD Reference.
+ * @NL80211_ATTR_MLD_LINK_IDS: nested attribute to hold MLD link-ids.
+ * @NL80211_ATTR_MLD_LINK_MACS: nested attribute to hold MLD mac addrs.
+ * @NL80211_ATTR_RECONFIG: whether the operation is reconfiguration or not
+ *
  * @NL80211_ATTR_PUNCT_BITMAP: (u32) Preamble puncturing bitmap, lowest
  *	bit corresponds to the lowest 20 MHz channel. Each bit set to 1
  *	indicates that the sub-channel is punctured. Higher 16 bits are
@@ -2788,6 +2793,8 @@ enum nl80211_commands {
  * @NL80211_ATTR_MLD_LINK_IDS: nested attribute to hold MLD link-ids.
  * @NL80211_ATTR_MLD_LINK_MACS: nested attribute to hold MLD mac addrs.
  * @NL80211_ATTR_RECONFIG: whether the operation is reconfiguration or not
+ *
+ * @NL80211_ATTR_RADIO_IFACE: radio interface name of vif
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -3340,6 +3347,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_MLD_LINK_IDS,
 	NL80211_ATTR_MLD_LINK_MACS,
 	NL80211_ATTR_RECONFIG,
+
+	NL80211_ATTR_RADIO_IFACE,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -6391,13 +6400,13 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_RADAR_BACKGROUND: Device supports background radar/CAC
  *	detection.
  *
- * @NL80211_EXT_FEATURE_POWERED_ADDR_CHANGE: Device can perform a MAC address
- *	change without having to bring the underlying network device down
- *	first. For example, in station mode this can be used to vary the
- *	origin MAC address prior to a connection to a new AP for privacy
- *	or other reasons. Note that certain driver specific restrictions
- *	might apply, e.g. no scans in progress, no offchannel operations
- *	in progress, and no active connections.
+ * @NL80211_EXT_FEATURE_MLO: Driver/Device support Multi-link Operation(MLO)
+ *      feature.
+ *
+ * @NL80211_EXT_FEATURE_AUTH_TX_RANDOM_TA: Device supports randomized TA
+ *	for authentication frames in @NL80211_CMD_FRAME.
+ *
+ * @NL80211_EXT_FEATURE_PUNCT: Driver supports preamble puncturing in AP mode.
  *
  * @NL80211_EXT_FEATURE_PUNCT: Driver supports preamble puncturing in AP mode.
  *
@@ -6486,10 +6495,9 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_RESERVED_DO_NOT_USE_8 = 69,
 	NL80211_EXT_FEATURE_RESERVED_DO_NOT_USE_9 = 70,
 	NL80211_EXT_FEATURE_RESERVED_DO_NOT_USE_10 = 71,
-#ifdef CFG80211_PROP_MULTI_LINK_SUPPORT
 	NL80211_EXT_FEATURE_MLO,
 	NL80211_EXT_FEATURE_AUTH_TX_RANDOM_TA,
-#endif
+
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
 	MAX_NL80211_EXT_FEATURES = NUM_NL80211_EXT_FEATURES - 1

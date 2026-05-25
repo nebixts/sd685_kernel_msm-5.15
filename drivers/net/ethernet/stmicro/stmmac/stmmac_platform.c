@@ -17,9 +17,12 @@
 #include <linux/of_net.h>
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
+#include <linux/gpio/consumer.h>
 
 #include "stmmac.h"
 #include "stmmac_platform.h"
+
+extern long phyaddr_pt_param;
 
 #ifdef CONFIG_OF
 
@@ -124,19 +127,56 @@ static struct stmmac_axi *stmmac_axi_setup(struct platform_device *pdev)
 	return axi;
 }
 
+static struct device_node *get_mtl_queue_config(struct device_node *node,
+						char *mtl_queue_str,
+						char *qoscfg_str,
+						bool *qos_config_found)
+{
+	const char *config_name;
+	u32 count = 0, i;
+	int ret = 0;
+
+	count = of_property_count_elems_of_size(node, mtl_queue_str,
+						sizeof(u32)) - 1;
+
+	if (count < 0)
+		return NULL;
+
+	if (count == 0)
+		return of_parse_phandle(node, mtl_queue_str, 0);
+
+	for (i = count; i >= 0; i--) {
+		node = of_parse_phandle(node, mtl_queue_str, i);
+		if (!node)
+			return NULL;
+
+		ret = of_property_read_string(node, "qcom,config-name", &config_name);
+		if (ret < 0)
+			continue;
+
+		if (!strcasecmp(config_name, qoscfg_str)) {
+			*qos_config_found = true;
+			return node;
+		}
+	}
+
+	return node;
+}
+
 /**
  * stmmac_mtl_setup - parse DT parameters for multiple queues configuration
  * @pdev: platform device
  * @plat: enet data
  */
-static int stmmac_mtl_setup(struct platform_device *pdev,
-			    struct plat_stmmacenet_data *plat)
+int stmmac_mtl_setup(struct platform_device *pdev,
+		     struct plat_stmmacenet_data *plat)
 {
 	struct device_node *q_node;
 	struct device_node *rx_node;
 	struct device_node *tx_node;
 	u8 queue = 0;
 	int ret = 0;
+	bool qos_config_found = false;
 
 	/* For backwards-compatibility with device trees that don't have any
 	 * snps,mtl-rx-config or snps,mtl-tx-config properties, we fall back
@@ -152,11 +192,28 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 	plat->rx_queues_cfg[0].mode_to_use = MTL_QUEUE_DCB;
 	plat->tx_queues_cfg[0].mode_to_use = MTL_QUEUE_DCB;
 
-	rx_node = of_parse_phandle(pdev->dev.of_node, "snps,mtl-rx-config", 0);
+	if (strlen(plat->qoscfg) != 0)
+		rx_node = get_mtl_queue_config(pdev->dev.of_node,
+					       "snps,mtl-rx-config",
+					       plat->qoscfg,
+					       &qos_config_found);
+	else
+		rx_node = of_parse_phandle(pdev->dev.of_node,
+					   "snps,mtl-rx-config",
+					   0);
+
 	if (!rx_node)
 		return ret;
 
-	tx_node = of_parse_phandle(pdev->dev.of_node, "snps,mtl-tx-config", 0);
+	if (strlen(plat->qoscfg) != 0)
+		tx_node = get_mtl_queue_config(pdev->dev.of_node,
+					       "snps,mtl-tx-config",
+					       plat->qoscfg,
+					       &qos_config_found);
+	else
+		tx_node = of_parse_phandle(pdev->dev.of_node,
+					   "snps,mtl-tx-config", 0);
+
 	if (!tx_node) {
 		of_node_put(rx_node);
 		return ret;
@@ -173,6 +230,11 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 		plat->rx_sched_algorithm = MTL_RX_ALGORITHM_WSP;
 	else
 		plat->rx_sched_algorithm = MTL_RX_ALGORITHM_SP;
+
+	if (of_property_read_bool(rx_node, "snps,mka_mcbcq_filtering"))
+		plat->mka_mcbcq_filtering = true;
+	else
+		plat->mka_mcbcq_filtering = false;
 
 	/* Processing individual RX queue config */
 	for_each_child_of_node(rx_node, q_node) {
@@ -212,6 +274,26 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 			plat->rx_queues_cfg[queue].pkt_route = PACKET_MCBCQ;
 		else
 			plat->rx_queues_cfg[queue].pkt_route = 0x0;
+
+		if (of_property_read_bool(q_node, "snps,threshold_byte")) {
+			of_property_read_u32(q_node, "snps,threshold_byte",
+					     &plat->rx_queues_cfg[queue].threshold_byte);
+			plat->rx_queues_cfg[queue].thresholdmode = true;
+		}
+
+		if (of_property_read_bool(q_node, "snps,fifo_depth"))
+			of_property_read_u32(q_node, "snps,fifo_depth",
+					     &plat->rx_queues_cfg[queue].fifo_sz_bytes);
+
+		if (of_property_read_bool(q_node, "qcom,ipa_offload"))
+			plat->rx_queues_cfg[queue].skip_sw = true;
+
+		/* Multicast and broadcast routing */
+		if (of_property_read_bool(q_node, "snps,route-multi-broad"))
+			plat->rx_queues_cfg[queue].mbcast_route = true;
+
+		if (of_property_read_bool(q_node, "snps,skip-queue"))
+			plat->rx_queues_cfg[queue].skip_sw = true;
 
 		queue++;
 	}
@@ -278,8 +360,25 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 			plat->tx_queues_cfg[queue].use_prio = true;
 		}
 
+		if (of_property_read_bool(q_node, "snps,fifo_depth"))
+			of_property_read_u32(q_node, "snps,fifo_depth",
+					     &plat->tx_queues_cfg[queue].fifo_sz_bytes);
+
+		if (of_property_read_bool(q_node, "qcom,ipa_offload"))
+			plat->tx_queues_cfg[queue].skip_sw = true;
+
+		if (of_property_read_bool(q_node, "snps,skip-queue"))
+			plat->tx_queues_cfg[queue].skip_sw = true;
+
 		queue++;
 	}
+
+	if (qos_config_found) {
+		plat->rx_qos_queues_to_use = plat->rx_queues_to_use;
+		plat->tx_qos_queues_to_use = plat->tx_queues_to_use;
+		plat->qos_supported = true;
+	}
+
 #if !IS_ENABLED(CONFIG_DWMAC_QCOM_ETHQOS)
 	if (queue != plat->tx_queues_to_use) {
 		ret = -EINVAL;
@@ -374,7 +473,7 @@ static int stmmac_mdio_setup(struct plat_stmmacenet_data *plat,
 		if (!plat->mdio_bus_data)
 			return -ENOMEM;
 
-		plat->mdio_bus_data->needs_reset = true;
+	plat->mdio_bus_data->needs_reset = true;
 	}
 
 	return 0;
@@ -470,7 +569,10 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	plat->phy_addr = -1;
 
 	/* Flag for mac2mac feature support*/
-	plat->mac2mac_en = of_property_read_bool(np, "mac2mac");
+	if (of_property_read_bool(np, "mac2mac")) {
+		of_property_read_u32(np, "mac2mac", &plat->mac2mac_en);
+		dev_info(&pdev->dev, "dt mac2mac_en = %d\n", plat->mac2mac_en);
+	}
 
 	/* Default to get clk_csr from stmmac_clk_crs_set(),
 	 * or get clk_csr from device tree.
@@ -484,12 +586,19 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	if (of_property_read_u32(np, "snps,phy-addr", &plat->phy_addr) == 0)
 		dev_warn(&pdev->dev, "snps,phy-addr property is deprecated\n");
 
+<<<<<<< HEAD
 	if (!plat->mac2mac_en) {
 		rc = stmmac_mdio_setup(plat, np, &pdev->dev);
 		if (rc) {
 			ret = ERR_PTR(rc);
 			goto error_put_phy;
 		}
+=======
+	rc = stmmac_mdio_setup(plat, np, &pdev->dev);
+	if (rc) {
+		ret = ERR_PTR(rc);
+		goto error_put_phy;
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 	}
 
 	of_property_read_u32(np, "tx-fifo-depth", &plat->tx_fifo_size);
@@ -603,6 +712,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 
 	of_property_read_u32(np, "snps,ps-speed", &plat->mac_port_sel_speed);
 
+	plat->crc_strip_en = of_property_read_bool(np, "snps,crc_strip");
+
 	plat->axi = stmmac_axi_setup(pdev);
 
 	rc = stmmac_mtl_setup(pdev, plat);
@@ -658,6 +769,15 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	if (IS_ERR(plat->stmmac_ahb_rst)) {
 		ret = plat->stmmac_ahb_rst;
 		goto error_hw_init;
+	}
+
+	if (of_property_read_bool(np, "reset-names")) {
+		plat->rgmii_rst = of_reset_control_get(np, "emac0_rgmii_clk_ares");
+		if (IS_ERR(plat->rgmii_rst)) {
+			ret = plat->rgmii_rst;
+			dev_err(&pdev->dev, "Cannot get emac0_rgmii_clk_ares\n");
+			goto error_hw_init;
+		}
 	}
 
 	return plat;
@@ -740,10 +860,19 @@ void stmmac_remove_config_dt(struct platform_device *pdev,
 			     struct plat_stmmacenet_data *plat)
 {
 }
+
+int stmmac_mtl_setup(struct platform_device *pdev,
+		     struct plat_stmmacenet_data *plat)
+{
+	return -EINVAL;
+}
+
 #endif /* CONFIG_OF */
 EXPORT_SYMBOL_GPL(stmmac_probe_config_dt);
 EXPORT_SYMBOL_GPL(devm_stmmac_probe_config_dt);
 EXPORT_SYMBOL_GPL(stmmac_remove_config_dt);
+EXPORT_SYMBOL_GPL(stmmac_mtl_setup);
+
 
 int stmmac_get_platform_resources(struct platform_device *pdev,
 				  struct stmmac_resources *stmmac_res)

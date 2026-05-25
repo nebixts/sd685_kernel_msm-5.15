@@ -195,7 +195,7 @@ bool qti_hwkm_init_required(const struct ice_mmio_data *mmio_data)
 	val = val & 0x1;
 	return (val == 1);
 }
-EXPORT_SYMBOL(qti_hwkm_init_required);
+EXPORT_SYMBOL_GPL(qti_hwkm_init_required);
 
 static int qti_hwkm_ice_init_sequence(const struct ice_mmio_data *mmio_data)
 {

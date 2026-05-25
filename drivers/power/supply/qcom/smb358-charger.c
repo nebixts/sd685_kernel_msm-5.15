@@ -2232,7 +2232,7 @@ static void smb358_debugfs_init(struct smb358_charger *chip)
 				rc);
 		}
 
-		ent = debugfs_create_x32("address", S_IFREG | 0644,
+		debugfs_create_x32("address", S_IFREG | 0644,
 					  chip->debug_root,
 					  &(chip->peek_poke_address));
 		if (!ent || IS_ERR(ent)) {

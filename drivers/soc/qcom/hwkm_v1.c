@@ -88,7 +88,7 @@ bool qti_hwkm_init_required(const struct ice_mmio_data *mmio_data)
 	val = (val >> ICE_LEGACY_MODE_EN_OTP) & 0x1;
 	return (val == 1);
 }
-EXPORT_SYMBOL(qti_hwkm_init_required);
+EXPORT_SYMBOL_GPL(qti_hwkm_init_required);
 
 static inline unsigned int qti_hwkm_get_reg_data(struct ice_mmio_data *mmio_data,
 						 u32 reg, u32 offset, u32 mask,

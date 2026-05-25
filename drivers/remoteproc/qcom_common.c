@@ -5,11 +5,12 @@
  * Copyright (C) 2016 Linaro Ltd
  * Copyright (C) 2015 Sony Mobile Communications Inc
  * Copyright (c) 2012-2013, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/firmware.h>
 #include <linux/kernel.h>
+#include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/notifier.h>
 #include <linux/remoteproc.h>
@@ -18,11 +19,10 @@
 #include <linux/slab.h>
 #include <linux/soc/qcom/mdt_loader.h>
 #include <linux/soc/qcom/smem.h>
-#include <linux/devcoredump.h>
-#include <trace/hooks/remoteproc.h>
+#include <linux/sysfs.h>
 #include <trace/events/rproc_qcom.h>
+#include <trace/hooks/remoteproc.h>
 
-#include "remoteproc_elf_helpers.h"
 #include "remoteproc_internal.h"
 #include "qcom_common.h"
 
@@ -183,112 +183,6 @@ static int qcom_add_minidump_segments(struct rproc *rproc, struct minidump_subsy
 	return 0;
 }
 
-static void qcom_rproc_minidump(struct rproc *rproc, struct device *md_dev)
-{
-	struct rproc_dump_segment *segment;
-	void *shdr;
-	void *ehdr;
-	size_t data_size;
-	size_t strtbl_size = 0;
-	size_t strtbl_index = 1;
-	size_t offset;
-	void *data;
-	u8 class = rproc->elf_class;
-	int shnum;
-	unsigned int dump_conf = rproc->dump_conf;
-	char *str_tbl = "STR_TBL";
-
-	if (list_empty(&rproc->dump_segments) ||
-	    dump_conf == RPROC_COREDUMP_DISABLED)
-		return;
-
-	if (class == ELFCLASSNONE) {
-		dev_err(&rproc->dev, "Elf class is not set\n");
-		return;
-	}
-
-	/*
-	 * We allocate two extra section headers. The first one is null.
-	 * Second section header is for the string table. Also space is
-	 * allocated for string table.
-	 */
-	data_size = elf_size_of_hdr(class) + 2 * elf_size_of_shdr(class);
-	shnum = 2;
-
-	/* the extra byte is for the null character at index 0 */
-	strtbl_size += strlen(str_tbl) + 2;
-
-	list_for_each_entry(segment, &rproc->dump_segments, node) {
-		data_size += elf_size_of_shdr(class);
-		strtbl_size += strlen(segment->priv) + 1;
-		data_size += segment->size;
-		shnum++;
-	}
-
-	data_size += strtbl_size;
-
-	data = vmalloc(data_size);
-	if (!data)
-		return;
-
-	ehdr = data;
-	memset(ehdr, 0, elf_size_of_hdr(class));
-	/* e_ident field is common for both elf32 and elf64 */
-	elf_hdr_init_ident(ehdr, class);
-	elf_hdr_set_e_type(class, ehdr, ET_CORE);
-	elf_hdr_set_e_machine(class, ehdr, rproc->elf_machine);
-	elf_hdr_set_e_version(class, ehdr, EV_CURRENT);
-	elf_hdr_set_e_entry(class, ehdr, rproc->bootaddr);
-	elf_hdr_set_e_shoff(class, ehdr, elf_size_of_hdr(class));
-	elf_hdr_set_e_ehsize(class, ehdr, elf_size_of_hdr(class));
-	elf_hdr_set_e_shentsize(class, ehdr, elf_size_of_shdr(class));
-	elf_hdr_set_e_shnum(class, ehdr, shnum);
-	elf_hdr_set_e_shstrndx(class, ehdr, 1);
-
-	/*
-	 * The zeroth index of the section header is reserved and is rarely used.
-	 * Set the section header as null (SHN_UNDEF) and move to the next one.
-	 */
-	shdr = data + elf_hdr_get_e_shoff(class, ehdr);
-	memset(shdr, 0, elf_size_of_shdr(class));
-	shdr += elf_size_of_shdr(class);
-
-	/* Initialize the string table. */
-	offset = elf_hdr_get_e_shoff(class, ehdr) +
-		 elf_size_of_shdr(class) * elf_hdr_get_e_shnum(class, ehdr);
-	memset(data + offset, 0, strtbl_size);
-
-	/* Fill in the string table section header. */
-	memset(shdr, 0, elf_size_of_shdr(class));
-	elf_shdr_set_sh_type(class, shdr, SHT_STRTAB);
-	elf_shdr_set_sh_offset(class, shdr, offset);
-	elf_shdr_set_sh_size(class, shdr, strtbl_size);
-	elf_shdr_set_sh_entsize(class, shdr, 0);
-	elf_shdr_set_sh_flags(class, shdr, 0);
-	elf_shdr_set_sh_name(class, shdr, elf_strtbl_add(str_tbl, ehdr, class, &strtbl_index));
-	offset += elf_shdr_get_sh_size(class, shdr);
-	shdr += elf_size_of_shdr(class);
-
-	list_for_each_entry(segment, &rproc->dump_segments, node) {
-		memset(shdr, 0, elf_size_of_shdr(class));
-		elf_shdr_set_sh_type(class, shdr, SHT_PROGBITS);
-		elf_shdr_set_sh_offset(class, shdr, offset);
-		elf_shdr_set_sh_addr(class, shdr, segment->da);
-		elf_shdr_set_sh_size(class, shdr, segment->size);
-		elf_shdr_set_sh_entsize(class, shdr, 0);
-		elf_shdr_set_sh_flags(class, shdr, SHF_WRITE);
-		elf_shdr_set_sh_name(class, shdr,
-				     elf_strtbl_add(segment->priv, ehdr, class, &strtbl_index));
-
-		/* No need to copy segments for inline dumps */
-		segment->dump(rproc, segment, data + offset, 0, segment->size);
-		offset += elf_shdr_get_sh_size(class, shdr);
-		shdr += elf_size_of_shdr(class);
-	}
-
-	dev_coredumpv(md_dev, data, data_size, GFP_KERNEL);
-}
-
 int qcom_rproc_toggle_load_state(struct qmp *qmp, const char *name, bool enable)
 {
 	char buf[QMP_MSG_LEN] = {};
@@ -298,10 +192,9 @@ int qcom_rproc_toggle_load_state(struct qmp *qmp, const char *name, bool enable)
 		 name, enable ? "on" : "off");
 	return qmp_send(qmp, buf, sizeof(buf));
 }
-EXPORT_SYMBOL(qcom_rproc_toggle_load_state);
+EXPORT_SYMBOL_GPL(qcom_rproc_toggle_load_state);
 
-void qcom_minidump(struct rproc *rproc, struct device *md_dev,
-				unsigned int minidump_id, rproc_dumpfn_t dumpfn)
+void qcom_minidump(struct rproc *rproc, unsigned int minidump_id, rproc_dumpfn_t dumpfn)
 {
 	int ret;
 	struct minidump_subsystem *subsystem;
@@ -341,10 +234,9 @@ void qcom_minidump(struct rproc *rproc, struct device *md_dev,
 	}
 
 	if (rproc->elf_class == ELFCLASS64)
-		qcom_rproc_minidump(rproc, md_dev);
+		rproc_coredump_using_sections(rproc);
 	else
 		rproc_coredump(rproc);
-
 clean_minidump:
 	qcom_minidump_cleanup(rproc);
 }
@@ -415,6 +307,18 @@ static void glink_subdev_unprepare(struct rproc_subdev *subdev)
 	qcom_glink_ssr_notify(glink->ssr_name);
 }
 
+static int glink_subdev_suspend(struct rproc_subdev *subdev)
+{
+	glink_subdev_stop(subdev, false);
+	return 0;
+}
+
+static int glink_subdev_suspend_unprepare(struct rproc_subdev *subdev)
+{
+	glink_subdev_unprepare(subdev);
+	return 0;
+}
+
 /**
  * qcom_add_glink_subdev() - try to add a GLINK subdevice to rproc
  * @rproc:	rproc handle to parent the subdevice
@@ -439,6 +343,10 @@ void qcom_add_glink_subdev(struct rproc *rproc, struct qcom_rproc_glink *glink,
 	glink->subdev.prepare = glink_subdev_prepare;
 	glink->subdev.stop = glink_subdev_stop;
 	glink->subdev.unprepare = glink_subdev_unprepare;
+	glink->subdev.resume = glink_subdev_start;
+	glink->subdev.resume_prepare = glink_subdev_prepare;
+	glink->subdev.suspend = glink_subdev_suspend;
+	glink->subdev.suspend_unprepare = glink_subdev_suspend_unprepare;
 
 	rproc_add_subdev(rproc, &glink->subdev);
 }
@@ -704,6 +612,18 @@ static inline void notify_ssr_clients(struct qcom_rproc_ssr *ssr, struct qcom_ss
 	del_timer_sync(&ssr->timer);
 }
 
+void qcom_rproc_send_ssr_uevent(struct rproc *rproc, const char *event)
+{
+	char event_buf[64];
+	char *envp[] = {
+		event_buf,
+		NULL,
+	};
+
+	snprintf(event_buf, sizeof(event_buf), "QCOM_SSR_EVENT=%s", event);
+	kobject_uevent_env(&rproc->dev.kobj, KOBJ_CHANGE, envp);
+}
+
 static int ssr_notify_prepare(struct rproc_subdev *subdev)
 {
 	struct qcom_rproc_ssr *ssr = to_ssr_subdev(subdev);
@@ -716,6 +636,8 @@ static int ssr_notify_prepare(struct rproc_subdev *subdev)
 
 	ssr->notification = QCOM_SSR_BEFORE_POWERUP;
 	notify_ssr_clients(ssr, &data);
+	qcom_rproc_send_ssr_uevent(ssr->rproc, "BEFORE_POWERUP");
+
 	return 0;
 }
 
@@ -731,6 +653,8 @@ static int ssr_notify_start(struct rproc_subdev *subdev)
 
 	ssr->notification = QCOM_SSR_AFTER_POWERUP;
 	notify_ssr_clients(ssr, &data);
+	qcom_rproc_send_ssr_uevent(ssr->rproc, "AFTER_POWERUP");
+
 	return 0;
 }
 
@@ -746,6 +670,7 @@ static void ssr_notify_stop(struct rproc_subdev *subdev, bool crashed)
 
 	ssr->notification = QCOM_SSR_BEFORE_SHUTDOWN;
 	notify_ssr_clients(ssr, &data);
+	qcom_rproc_send_ssr_uevent(ssr->rproc, "BEFORE_SHUTDOWN");
 }
 
 static void ssr_notify_unprepare(struct rproc_subdev *subdev)
@@ -760,6 +685,69 @@ static void ssr_notify_unprepare(struct rproc_subdev *subdev)
 
 	ssr->notification = QCOM_SSR_AFTER_SHUTDOWN;
 	notify_ssr_clients(ssr, &data);
+	qcom_rproc_send_ssr_uevent(ssr->rproc, "AFTER_SHUTDOWN");
+}
+
+static int ssr_notify_resume_prepare(struct rproc_subdev *subdev)
+{
+	struct qcom_rproc_ssr *ssr = to_ssr_subdev(subdev);
+	struct qcom_ssr_notify_data data = {
+		.name = ssr->info->name,
+		.crashed = false,
+	};
+
+	trace_rproc_qcom_event(ssr->info->name, SSR_SUBDEV_NAME, "resume prepare");
+
+	ssr->notification = QCOM_SSR_BEFORE_DS_EXIT;
+	notify_ssr_clients(ssr, &data);
+	return 0;
+}
+
+static int ssr_notify_resume(struct rproc_subdev *subdev)
+{
+	struct qcom_rproc_ssr *ssr = to_ssr_subdev(subdev);
+	struct qcom_ssr_notify_data data = {
+		.name = ssr->info->name,
+		.crashed = false,
+	};
+
+	trace_rproc_qcom_event(ssr->info->name, SSR_SUBDEV_NAME, "resume");
+
+	ssr->notification = QCOM_SSR_AFTER_DS_EXIT;
+	notify_ssr_clients(ssr, &data);
+	return 0;
+}
+
+static int ssr_notify_suspend(struct rproc_subdev *subdev)
+{
+	struct qcom_rproc_ssr *ssr = to_ssr_subdev(subdev);
+	struct qcom_ssr_notify_data data = {
+		.name = ssr->info->name,
+		.crashed = false,
+	};
+
+	trace_rproc_qcom_event(ssr->info->name, SSR_SUBDEV_NAME, "suspend");
+
+	ssr->notification = QCOM_SSR_BEFORE_DS_ENTER;
+	notify_ssr_clients(ssr, &data);
+
+	return 0;
+}
+
+static int ssr_notify_suspend_unprepare(struct rproc_subdev *subdev)
+{
+	struct qcom_rproc_ssr *ssr = to_ssr_subdev(subdev);
+	struct qcom_ssr_notify_data data = {
+		.name = ssr->info->name,
+		.crashed = false,
+	};
+
+	trace_rproc_qcom_event(ssr->info->name, SSR_SUBDEV_NAME, "suspend unprepare");
+
+	ssr->notification = QCOM_SSR_AFTER_DS_ENTER;
+	notify_ssr_clients(ssr, &data);
+
+	return 0;
 }
 
 /**
@@ -785,11 +773,16 @@ void qcom_add_ssr_subdev(struct rproc *rproc, struct qcom_rproc_ssr *ssr,
 
 	timer_setup(&ssr->timer, ssr_notif_timeout_handler, 0);
 
+	ssr->rproc = rproc;
 	ssr->info = info;
 	ssr->subdev.prepare = ssr_notify_prepare;
 	ssr->subdev.start = ssr_notify_start;
 	ssr->subdev.stop = ssr_notify_stop;
 	ssr->subdev.unprepare = ssr_notify_unprepare;
+	ssr->subdev.resume_prepare = ssr_notify_resume_prepare;
+	ssr->subdev.resume = ssr_notify_resume;
+	ssr->subdev.suspend = ssr_notify_suspend;
+	ssr->subdev.suspend_unprepare = ssr_notify_suspend_unprepare;
 
 	rproc_add_subdev(rproc, &ssr->subdev);
 }

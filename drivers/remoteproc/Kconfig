@@ -139,6 +139,13 @@ config PRU_REMOTEPROC
 	  processors on various TI SoCs. It's safe to say N here if you're
 	  not interested in the PRU or if you are unsure.
 
+config RPROC_DEEPSLEEP
+	bool "Rproc Deep Sleep"
+	depends on REMOTEPROC
+	help
+	  This option is used to communicate with and control the remoteproc
+	  subsystems to into Deep Sleep state, such as modem and adsp.
+
 config QCOM_PIL_INFO
 	tristate
 
@@ -470,6 +477,16 @@ config QCOM_DS_SKIP_Q6_STOP
 	  This option skips sending the stop notification to Q6 as part
 	  of Deepsleep flow, based on the assumption that the Q6 is
 	  already in Low-power state.
+
+	  If not sure, say N.
+
+config FIRMWARE_FAIL_SAFE
+	bool "Support for reboot if there is firmware image corrupted/invalid"
+	help
+	  This setting enables the system to reboot with a specific reason (firmware
+	  authentication failed) if the firmware image is either corrupted or invalid.
+	  This can occur due to authentication failures or issues detected at the
+	  kernel level during firmware loading.
 
 	  If not sure, say N.
 

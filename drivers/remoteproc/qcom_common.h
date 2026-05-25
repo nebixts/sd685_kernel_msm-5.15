@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef __RPROC_QCOM_COMMON_H__
 #define __RPROC_QCOM_COMMON_H__
@@ -18,6 +18,10 @@ static const char * const subdevice_state_string[] = {
 	[QCOM_SSR_AFTER_POWERUP]	= "after_powerup",
 	[QCOM_SSR_BEFORE_SHUTDOWN]	= "before_shutdown",
 	[QCOM_SSR_AFTER_SHUTDOWN]	= "after_shutdown",
+	[QCOM_SSR_BEFORE_DS_EXIT]	= "before_ds_exit",
+	[QCOM_SSR_AFTER_DS_EXIT]	= "after_ds_exit",
+	[QCOM_SSR_BEFORE_DS_ENTER]	= "before_ds_enter",
+	[QCOM_SSR_AFTER_DS_ENTER]	= "after_ds_enter",
 };
 
 struct reg_info {
@@ -56,6 +60,7 @@ struct qcom_rproc_ssr {
 	enum qcom_ssr_notify_type notification;
 	struct timer_list timer;
 	struct qcom_ssr_subsystem *info;
+	struct rproc *rproc;
 };
 
 extern bool qcom_device_shutdown_in_progress;
@@ -63,8 +68,7 @@ extern bool qcom_device_shutdown_in_progress;
 typedef void (*rproc_dumpfn_t)(struct rproc *rproc, struct rproc_dump_segment *segment,
 			       void *dest, size_t offset, size_t size);
 
-void qcom_minidump(struct rproc *rproc, struct device *md_dev,
-			unsigned int minidump_id, rproc_dumpfn_t dumpfn);
+void qcom_minidump(struct rproc *rproc, unsigned int minidump_id, rproc_dumpfn_t dumpfn);
 
 int qcom_rproc_toggle_load_state(struct qmp *qmp, const char *name, bool enable);
 

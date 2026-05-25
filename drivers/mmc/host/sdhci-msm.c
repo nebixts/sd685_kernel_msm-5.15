@@ -201,7 +201,10 @@
 #define VS_CAPABILITIES_SDR_50_SUPPORT BIT(0)
 #define VS_CAPABILITIES_SDR_104_SUPPORT BIT(1)
 #define VS_CAPABILITIES_DDR_50_SUPPORT BIT(2)
+<<<<<<< HEAD
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 /* Max load for SD Vdd supply */
 #define SD_VMMC_MAX_LOAD_UA	800000
 
@@ -1966,7 +1969,6 @@ static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
 	u32 val = SWITCHABLE_SIGNALING_VOLTAGE;
 	const struct sdhci_msm_offset *msm_offset =
 					msm_host->offset;
-	struct mmc_host *mmc = host->mmc;
 
 	pr_debug("%s: %s: request %d curr_pwr_state %x curr_io_level %x\n",
 			mmc_hostname(host->mmc), __func__, req_type,
@@ -2378,7 +2380,8 @@ static int sdhci_msm_vreg_init(struct device *dev,
 	}
 	if (curr_vdd_io_reg) {
 		ret = sdhci_msm_vreg_init_reg(dev, curr_vdd_io_reg);
-
+		if (ret)
+			goto out;
 		/* In eMMC case vdd-io might be a fixed 1.8V regulator */
 		if (mmc->caps & MMC_CAP_NONREMOVABLE &&
 			!regulator_is_supported_voltage(curr_vdd_io_reg->reg,
@@ -3768,7 +3771,7 @@ static void sdhci_msm_reset(struct sdhci_host *host, u8 mask)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
 
-	if ((host->mmc->caps2 & MMC_CAP2_CQE) && (mask & SDHCI_RESET_ALL))
+	if ((host->mmc) && (host->mmc->caps2 & MMC_CAP2_CQE) && (mask & SDHCI_RESET_ALL))
 		cqhci_deactivate(host->mmc);
 
 	if (msm_host->rst_n_disable && host->mmc && host->mmc->card &&
@@ -4486,9 +4489,9 @@ static void sdhci_msm_qos_init(struct sdhci_msm_host *msm_host)
 	struct sdhci_msm_qos_req *qr;
 	struct qos_cpu_group *qcg;
 
-	cpumask_t silver_mask;
-	cpumask_t gold_mask;
-	cpumask_t gold_prime_mask;
+	cpumask_t silver_mask = CPU_MASK_NONE;
+	cpumask_t gold_mask = CPU_MASK_NONE;
+	cpumask_t gold_prime_mask = CPU_MASK_NONE;
 	int cid_cpu[MAX_NUM_CLUSTERS] = {-1, -1, -1};
 	int cid = -1;
 	int prev_cid = -1;
@@ -4996,6 +4999,9 @@ static void mmc_cache_card(void *unused, struct mmc_host *mmc)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
 
+	if (msm_host->is_partial_init_broken)
+		return;
+
 	memcpy(&msm_host->cached_ios, &mmc->ios, sizeof(msm_host->cached_ios));
 	mmc_cache_card_ext_csd(mmc);
 
@@ -5012,7 +5018,15 @@ static int mmc_can_sleep(struct mmc_card *card)
 static void partial_init(void *unused, struct mmc_host *host, bool *partial_init)
 {
 	int err;
+	struct sdhci_host *shost = mmc_priv(host);
 	bool deepsleep = pm_suspend_via_firmware();
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(shost);
+	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+
+	if (msm_host->is_partial_init_broken) {
+		*partial_init = false;
+		return;
+	}
 
 	if (deepsleep) {
 		host->ops->hw_reset(host);
@@ -5273,6 +5287,10 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 
 	if (of_property_read_bool(node, "is_rumi"))
 		sdhci_msm_set_rumi_bus_mode(host);
+
+	msm_host->is_partial_init_broken =
+		of_property_read_bool(dev->of_node,
+			"qcom,no-partial-init");
 
 	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
 	dev_dbg(&pdev->dev, "Host Version: 0x%x Vendor Version 0x%x\n",

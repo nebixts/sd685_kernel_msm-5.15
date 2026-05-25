@@ -39,7 +39,7 @@
 #define MHI_DEFAULT_NUM_OF_NW_CLIENTS 1
 #define MAX_MHI_INSTANCES      17
 #define MHI_PF_ID              0
-#define MAX_NUM_OF_CLIENTS     15
+#define MAX_NUM_OF_CLIENTS     16
 
 enum mhi_dev_net_dbg_lvl {
 	MHI_VERBOSE = 0x1,
@@ -218,6 +218,16 @@ static struct mhi_dev_net_chan_attr mhi_chan_attr_table_netdev[] = {
 	},
 	{
 		MHI_CLIENT_IP_SW_18_IN,
+		TRB_MAX_DATA_SIZE,
+		MHI_DIR_IN,
+	},
+	{
+		MHI_CLIENT_IP_SW_19_OUT,
+		TRB_MAX_DATA_SIZE,
+		MHI_DIR_OUT,
+	},
+	{
+		MHI_CLIENT_IP_SW_19_IN,
 		TRB_MAX_DATA_SIZE,
 		MHI_DIR_IN,
 	},
@@ -555,7 +565,6 @@ static void mhi_dev_net_write_completion_cb(void *req)
 				"Failed to assign client handle\n");
 		return;
 	}
-
 	spin_lock_irqsave(&client_handle->wrt_lock, flags);
 	list_add_tail(&wreq->list, &client_handle->wr_req_buffers);
 	spin_unlock_irqrestore(&client_handle->wrt_lock, flags);
@@ -617,6 +626,7 @@ static netdev_tx_t mhi_dev_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct mhi_dev_net_client *mhi_dev_net_ptr =
 			*(struct mhi_dev_net_client **)netdev_priv(dev);
 	unsigned long flags;
+	int len;
 
 	if (skb->len <= 0) {
 		mhi_dev_net_log(mhi_dev_net_ptr->vf_id, MHI_ERROR,
@@ -625,7 +635,15 @@ static netdev_tx_t mhi_dev_net_xmit(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_OK;
 	}
 	spin_lock_irqsave(&mhi_dev_net_ptr->wrt_lock, flags);
-	skb_queue_tail(&(mhi_dev_net_ptr->tx_buffers), skb);
+	len = skb_queue_len(&(mhi_dev_net_ptr->tx_buffers));
+	if (len <= (2 * mhi_net_ctxt.tx_reqs)) {
+		skb_queue_tail(&(mhi_dev_net_ptr->tx_buffers), skb);
+	} else {
+		mhi_dev_net_log(mhi_dev_net_ptr->vf_id, MHI_INFO, "channel queue is full\n");
+		netif_stop_queue(mhi_dev_net_ptr->dev);
+		spin_unlock_irqrestore(&mhi_dev_net_ptr->wrt_lock, flags);
+		return NETDEV_TX_BUSY;
+	}
 	spin_unlock_irqrestore(&mhi_dev_net_ptr->wrt_lock, flags);
 
 	queue_work(mhi_dev_net_ptr->pending_pckt_wq,
@@ -691,6 +709,7 @@ static void mhi_dev_net_ether_setup(struct net_device *dev)
 	ether_setup(dev);
 	dev->min_mtu = ETH_MIN_MTU;
 	dev->max_mtu = ETH_MAX_MTU;
+	dev->mtu = MHI_NET_DEFAULT_MTU;
 }
 
 static int mhi_dev_net_enable_iface(struct mhi_dev_net_client *mhi_dev_net_ptr)
@@ -843,7 +862,6 @@ static int mhi_dev_net_close(void)
 {
 	struct mhi_dev_net_client *client;
 	u32 i, num_mhi = mhi_net_ctxt.num_mhi_instances;
-
 	for (i = 0; i < mhi_net_ctxt.mhi_num_nw_client_limit * num_mhi; i++) {
 		client = mhi_net_ctxt.client_handles[i];
 		if (!client)
@@ -926,9 +944,9 @@ static void mhi_dev_net_state_cb(struct mhi_dev_client_cb_data *cb_data)
 			mhi_client->out_chan);
 		return;
 	}
-	mhi_dev_net_log(mhi_client->vf_id, MHI_MSG_VERBOSE, "IN ch_id::%d, state :%d\n",
+	mhi_dev_net_log(mhi_client->vf_id, MHI_VERBOSE, "IN ch_id::%d, state :%d\n",
 			mhi_client->in_chan, info_in_ch);
-	mhi_dev_net_log(mhi_client->vf_id, MHI_MSG_VERBOSE, "OUT ch_id:%d, state :%d\n",
+	mhi_dev_net_log(mhi_client->vf_id, MHI_VERBOSE, "OUT ch_id:%d, state :%d\n",
 			mhi_client->out_chan, info_out_ch);
 	if (info_in_ch == MHI_STATE_CONNECTED &&
 		info_out_ch == MHI_STATE_CONNECTED) {
@@ -967,6 +985,11 @@ int mhi_dev_net_interface_init(struct mhi_dev_ops *dev_ops, uint32_t vf_id, uint
 	struct mhi_dev_net_client **mhi_net_client = kcalloc(mhi_net_ctxt.mhi_num_nw_client_limit,
 						sizeof(struct mhi_dev_net_client *), GFP_KERNEL);
 	char mhi_net_vf_ipc_name[12] = "mhi-net-nn";
+
+	if (!mhi_net_client) {
+		mhi_dev_net_log(vf_id, MHI_ERROR, "Memory alloc failed for mhi_net_client\n");
+		return -ENOMEM;
+	}
 
 	if (!mhi_net_ctxt.client_handles) {
 		/*
@@ -1143,6 +1166,11 @@ static int mhi_dev_net_probe(struct platform_device *pdev)
 		} else {
 			mhi_net_ctxt.eth_iface_out_ch =
 				kcalloc(num_mhi_eth_chan, sizeof(uint32_t), GFP_KERNEL);
+			if (!mhi_net_ctxt.eth_iface_out_ch) {
+				mhi_dev_net_log(MHI_PF_ID, MHI_ERROR,
+						"Memory alloc failed for mhi_net_ctxt.eth_iface_out_ch\n");
+				return -ENOMEM;
+			}
 
 			ret = of_property_read_u32_array((&pdev->dev)->of_node,
 					"qcom,mhi-ethernet-interface-ch-list",
@@ -1156,14 +1184,14 @@ static int mhi_dev_net_probe(struct platform_device *pdev)
 					mhi_dev_net_log(MHI_PF_ID, MHI_INFO,
 							"mhi_net_ctxt.eth_iface_out_ch[%d]=%d\n", i,
 							mhi_net_ctxt.eth_iface_out_ch[i]);
-					mhi_dev_net_log(MHI_PF_ID, MHI_MSG_ERROR,
+					mhi_dev_net_log(MHI_PF_ID, MHI_ERROR,
 							"mhi_net_ctxt.eth_iface_out_ch[%d]=%d\n", i,
 							mhi_net_ctxt.eth_iface_out_ch[i]);
 					if (mhi_net_ctxt.eth_iface_out_ch[i]) {
 						mhi_dev_net_log(MHI_PF_ID, MHI_INFO,
 								"Channel %d uses ethernet interface\n",
 								mhi_net_ctxt.eth_iface_out_ch[i]);
-						mhi_dev_net_log(MHI_PF_ID, MHI_MSG_ERROR,
+						mhi_dev_net_log(MHI_PF_ID, MHI_ERROR,
 								"Channel %d uses ethernet interface\n",
 								mhi_net_ctxt.eth_iface_out_ch[i]);
 					}

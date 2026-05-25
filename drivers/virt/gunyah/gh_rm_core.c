@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  */
 
@@ -78,7 +77,9 @@ const static struct {
 	{GH_TRUSTED_VM, "trustedvm", "qcom,trustedvm"},
 	{GH_CPUSYS_VM, "cpusys_vm", "qcom,cpusysvm"},
 	{GH_OEM_VM, "oem_vm", "qcom,oemvm"},
+	{GH_TELE_VM, "tele_vm", "qcom,televm"},
 	{GH_AUTO_VM, "autoghgvm", "qcom,autoghgvm"},
+	{GH_FOTA_VM, "fota_vm", "qcom,fotavm"},
 	{GH_ROBOTICS_VM1, "roboticsvm1", "qcom,roboticsvm1"},
 	{GH_ROBOTICS_VM2, "rdcapvm", "qcom,rdcapvm"},
 };
@@ -558,7 +559,7 @@ static int gh_rm_recv_task_fn(void *data)
 
 static int gh_rm_send_request(u32 message_id,
 				const void *req_buff, size_t req_buff_size,
-				struct gh_rm_connection *connection)
+				struct gh_rm_connection *connection, bool tx_block)
 {
 	size_t buff_size_remaining = req_buff_size;
 	const void *req_buff_curr = req_buff;
@@ -575,14 +576,8 @@ static int gh_rm_send_request(u32 message_id,
 	if (gh_rm_msgq_desc == NULL)
 		return -EPROBE_DEFER;
 
-	num_fragments = (req_buff_size + GH_RM_MAX_MSG_SIZE_BYTES - 1) /
-			GH_RM_MAX_MSG_SIZE_BYTES;
-
-	/* The above calculation also includes the count
-	 * for the 'request' packet. Exclude it as the
-	 * header needs to fill the num. of fragments to follow.
-	 */
-	num_fragments--;
+	if (req_buff_size)
+		num_fragments = (req_buff_size - 1) / GH_RM_MAX_MSG_SIZE_BYTES;
 
 	if (num_fragments > GH_RM_MAX_NUM_FRAGMENTS) {
 		pr_err("%s: Limit exceeded for the number of fragments: %u\n",
@@ -624,6 +619,8 @@ static int gh_rm_send_request(u32 message_id,
 
 		/* Force the last fragment to be sent immediately to the receiver */
 		tx_flags = (i == num_fragments) ? GH_MSGQ_TX_PUSH : 0;
+		if (tx_block)
+			tx_flags |= GH_MSGQ_NONBLOCK;
 
 		/* delay sending console characters to RM */
 		if (message_id == GH_RM_RPC_MSG_ID_CALL_VM_CONSOLE_WRITE ||
@@ -667,7 +664,7 @@ void *gh_rm_call(gh_rm_msgid_t message_id,
 	int req_ret;
 	void *ret;
 
-	if (!message_id || !req_buff || !resp_buff_size || !rm_error)
+	if (!message_id || !resp_buff_size || !rm_error)
 		return ERR_PTR(-EINVAL);
 
 	connection = gh_rm_alloc_connection(message_id, seq_done_needed);
@@ -690,8 +687,9 @@ void *gh_rm_call(gh_rm_msgid_t message_id,
 	/* Send the request to the Resource Manager VM */
 	req_ret = gh_rm_send_request(message_id,
 					req_buff, req_buff_size,
-					connection);
+					connection, true);
 	if (req_ret < 0) {
+		pr_err("gh_rm_send_request ret=  %d\n", req_ret);
 		ret = ERR_PTR(req_ret);
 		goto out;
 	}
@@ -730,6 +728,38 @@ out:
 	return ret;
 }
 
+
+void *gh_rm_call_noblock(gh_rm_msgid_t message_id,
+			void *req_buff, size_t req_buff_size,
+			size_t *resp_buff_size, int *rm_error)
+{
+	struct gh_rm_connection *connection;
+	bool seq_done_needed = false;
+	int req_ret;
+
+	if (!message_id || !resp_buff_size || !rm_error)
+		return ERR_PTR(-EINVAL);
+
+	connection = gh_rm_alloc_connection(message_id, seq_done_needed);
+	if (IS_ERR_OR_NULL(connection))
+		return connection;
+
+	connection->seq = idr_alloc_cyclic(&gh_rm_call_idr, connection,
+					0, U16_MAX, GFP_KERNEL);
+	mutex_unlock(&gh_rm_call_idr_lock);
+
+	pr_debug("%s TX msg_id: %x\n", __func__, message_id);
+	print_hex_dump_debug("gh_rm_call TX: ", DUMP_PREFIX_OFFSET, 4, 1,
+			     req_buff, req_buff_size, false);
+
+	/* Send the request to the Resource Manager VM */
+	req_ret = gh_rm_send_request(message_id, req_buff, req_buff_size,
+				     connection, false);
+	idr_remove(&gh_rm_call_idr, connection->seq);
+
+	kfree(connection);
+	return 0;
+}
 /**
  * gh_rm_virq_to_irq: Get a Linux IRQ from a Gunyah-compatible vIRQ
  * @virq: Gunyah-compatible vIRQ

@@ -6,8 +6,8 @@
 
 #include <linux/bitmap.h>
 #include <linux/bitops.h>
+#include <linux/cpumask.h>
 #include <linux/console.h>
-#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
@@ -370,7 +370,6 @@ struct msm_geni_serial_port {
 	unsigned int kpi_idx;
 	unsigned int kpi_comp_idx;
 	enum geni_se_xfer_mode xfer_mode;
-	struct dentry *dbg;
 	bool port_setup;
 	unsigned int *rx_fifo;
 	int (*handle_rx)(struct uart_port *uport,
@@ -757,15 +756,20 @@ static void msm_geni_enable_disable_se_clk(struct uart_port *uport, bool enable)
  * The below API is required to check if uport->lock (spinlock)
  * is taken by the serial layer or not. If the lock is not taken
  * then we can rely on the isr to be fired and if the lock is taken
- * by the serial layer then we need to poll for the interrupts.
+ * by the serial layer or if it is a single core then we need to
+ * poll for the interrupts.
  *
  * Returns true(1) if spinlock is already taken by framework (serial layer)
+ * or if it is a single core system
  * Return false(0) if spinlock is not taken by framework.
  */
 static bool msm_geni_serial_spinlocked(struct uart_port *uport)
 {
 	unsigned long flags;
 	bool locked;
+
+	if (num_present_cpus() <= 1)
+		return true;
 
 	locked = spin_trylock_irqsave(&uport->lock, flags);
 	if (locked)
@@ -3431,13 +3435,13 @@ static int msm_geni_serial_handle_dma_tx(struct uart_port *uport)
 		exec_time = comp_time - sw_time;
 		UART_LOG_DBG(msm_port->ipc_log_kpi, uport->dev,
 			     "%s:TX transfer time %llu nsec(%llu usec) for %d bytes with freq %d index:%d\n",
-			     __func__, exec_time, (exec_time / 1000), len,
+			     __func__, exec_time, div_u64(exec_time, NSEC_PER_USEC), len,
 			     msm_port->cur_baud, msm_port->kpi_comp_idx);
 		sw_time = msm_port->uart_kpi_tx[msm_port->kpi_comp_idx].xfer_req_hw.time_stamp;
 		exec_time = comp_time - sw_time;
 		UART_LOG_DBG(msm_port->ipc_log_kpi, uport->dev,
 			     "%s:TX Hardware time %llu nsec(%llu usec) for %d bytes with freq %d index:%d\n",
-			     __func__, exec_time, (exec_time / 1000), len,
+			     __func__, exec_time, div_u64(exec_time, NSEC_PER_USEC), len,
 			     msm_port->cur_baud, msm_port->kpi_comp_idx);
 		msm_port->kpi_comp_idx++;
 		if (msm_port->kpi_comp_idx >= UART_KPI_TX_RX_INSTANCES)
@@ -4713,10 +4717,6 @@ static void msm_geni_serial_debug_init(struct uart_port *uport, bool console)
 	struct msm_geni_serial_port *msm_port = GET_DEV_PORT(uport);
 	char name[35];
 
-	msm_port->dbg = debugfs_create_dir(dev_name(uport->dev), NULL);
-	if (IS_ERR_OR_NULL(msm_port->dbg))
-		dev_err(uport->dev, "Failed to create dbg dir\n");
-
 	if (!console) {
 		memset(name, 0, sizeof(name));
 		if (!msm_port->ipc_log_rx) {
@@ -5278,11 +5278,11 @@ static int msm_geni_serial_port_init(struct platform_device *pdev,
 			return -ENOMEM;
 	} else {
 		dev_port->handle_rx = handle_rx_hs;
-		dev_port->rx_fifo =
-		devm_kzalloc(uport->dev, (dev_port->rx_fifo_depth *
-					  sizeof(u32)),	GFP_KERNEL);
+		dev_port->rx_fifo = devm_kzalloc(uport->dev, (dev_port->rx_fifo_depth *
+						 sizeof(u32)), GFP_KERNEL);
 		if (!dev_port->rx_fifo)
 			return -ENOMEM;
+		writel(DMA_IF_EN, uport->membase + SE_DMA_IF_EN);
 		if (dev_port->pm_auto_suspend_disable) {
 			pm_runtime_set_active(&pdev->dev);
 			pm_runtime_forbid(&pdev->dev);
@@ -5484,7 +5484,6 @@ static int msm_geni_serial_remove(struct platform_device *pdev)
 	device_remove_file(port->uport.dev, &dev_attr_xfer_mode);
 	device_remove_file(port->uport.dev, &dev_attr_ver_info);
 	device_remove_file(port->uport.dev, &dev_attr_capture_kpi);
-	debugfs_remove(port->dbg);
 
 	dev_info(&pdev->dev, "%s driver removed %d\n", __func__, true);
 	return 0;

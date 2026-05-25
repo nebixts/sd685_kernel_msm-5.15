@@ -706,6 +706,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev,
 	br_set_gso_limits(br);
 
 	kobject_uevent(&p->kobj, KOBJ_ADD);
+	call_netdevice_notifiers(NETDEV_BR_JOIN, dev);
 
 	return 0;
 
@@ -741,6 +742,8 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	p = br_port_get_rtnl(dev);
 	if (!p || p->br != br)
 		return -EINVAL;
+
+	call_netdevice_notifiers(NETDEV_BR_LEAVE, dev);
 
 	/* Since more than one interface can be attached to a bridge,
 	 * there still maybe an alternate path for netconsole to use;
@@ -785,3 +788,36 @@ bool br_port_flag_is_set(const struct net_device *dev, unsigned long flag)
 	return p->flags & flag;
 }
 EXPORT_SYMBOL_GPL(br_port_flag_is_set);
+
+#ifdef CONFIG_ENABLE_SFE
+/* br_port_dev_get()
+ * Using the given addr, identify the port to which it is reachable,
+ * returing a reference to the net device associated with that port.
+ *
+ * NOTE: Return NULL if given dev is not a bridge or
+ *       the mac has no associated port
+ */
+struct net_device *br_port_dev_get(struct net_device *dev, unsigned char *addr)
+{
+	struct net_bridge_fdb_entry *fdbe;
+	struct net_bridge *br;
+	struct net_device *netdev = NULL;
+
+	/* Is this a bridge? */
+	if (!(dev->priv_flags & IFF_EBRIDGE))
+		return NULL;
+
+	br = netdev_priv(dev);
+
+	/* Lookup the fdb entry and get reference to the port dev */
+	rcu_read_lock();
+	fdbe = br_fdb_find_rcu(br, addr, 0);
+	if (fdbe && fdbe->dst) {
+		netdev = fdbe->dst->dev; /* port device */
+		dev_hold(netdev);
+	}
+	rcu_read_unlock();
+	return netdev;
+}
+EXPORT_SYMBOL(br_port_dev_get);
+#endif

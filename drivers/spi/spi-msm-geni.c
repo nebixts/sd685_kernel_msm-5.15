@@ -23,12 +23,14 @@
 #include <linux/pinctrl/consumer.h>
 #include <soc/qcom/boot_stats.h>
 #include <linux/suspend.h>
+#include <linux/delay.h>
 
 #define SPI_NUM_CHIPSELECT	(4)
 #define SPI_XFER_TIMEOUT_MS	(250)
 #define SPI_AUTO_SUSPEND_DELAY	(250)
 #define SPI_XFER_TIMEOUT_OFFSET	(250)
 #define SPI_SLAVE_SYNC_XFER_TIMEOUT_OFFSET	(50)
+#define MAX_ITER	1000
 
 /* SPI SE specific registers */
 #define SE_SPI_CPHA		(0x224)
@@ -239,6 +241,8 @@ struct spi_geni_master {
 	bool is_dma_not_done;
 	int max_data_dump_size;
 };
+
+static int spi_geni_runtime_suspend(struct device *dev);
 
 /**
  * geni_spi_se_dump_dbg_regs() - Print relevant registers that capture most
@@ -2446,8 +2450,88 @@ static void spi_get_dt_property(struct platform_device *pdev,
 	geni_mas->slave_cross_connected =
 	of_property_read_bool(pdev->dev.of_node, "slv-cross-connected");
 }
-/**
- * geni_se_handle_common_resources: Load common resources.
+
+/*
+ * geni_check_stop_engine() - Check GENI status and stop the
+ * primary sequencer if it is active. This function operates
+ * in polling mode.
+ *
+ * @mas: pointer to spi_geni_master struct.
+ *
+ * Return: None.
+ */
+static void geni_check_stop_engine(struct spi_geni_master *mas)
+{
+	u32 geni_status = 0;
+	u32 count = MAX_ITER;
+	u32 m_irq = 0;
+
+	geni_se_common_clks_on(mas->spi_rsc.clk, mas->m_ahb_clk,
+			       mas->s_ahb_clk);
+	geni_status = geni_read_reg(mas->base, SE_GENI_STATUS);
+	if (geni_read_reg(mas->base, GENI_IF_DISABLE_RO) & FIFO_IF_DISABLE) {
+		geni_se_common_clks_off(mas->spi_rsc.clk, mas->m_ahb_clk,
+					mas->s_ahb_clk);
+		return;
+	}
+
+	SPI_LOG_DBG(mas->ipc, false, mas->dev,
+		    "%s: Geni_status:0x%x\n", __func__, geni_status);
+	if (geni_status & M_GENI_CMD_ACTIVE) {
+		geni_se_cancel_m_cmd(&mas->spi_rsc);
+		while (count) {
+			m_irq = geni_read_reg(mas->base, SE_GENI_M_IRQ_STATUS);
+			if (m_irq & M_CMD_CANCEL_EN) {
+				geni_write_reg(m_irq, mas->base, SE_GENI_M_IRQ_CLEAR);
+				SPI_LOG_DBG(mas->ipc, false, mas->dev,
+					    "%s: Cancel cmd success\n", __func__);
+				goto exit_geni_check_stop_engine;
+			}
+			count--;
+			usleep_range(10, 12);
+		}
+		geni_se_abort_m_cmd(&mas->spi_rsc);
+		count = MAX_ITER;
+		while (count) {
+			m_irq = geni_read_reg(mas->base, SE_GENI_M_IRQ_STATUS);
+			if (m_irq & M_CMD_ABORT_EN) {
+				geni_write_reg(m_irq, mas->base, SE_GENI_M_IRQ_CLEAR);
+				SPI_LOG_DBG(mas->ipc, false, mas->dev,
+					    "%s: Abort cmd success\n", __func__);
+				goto geni_tx_fsm_reset;
+			}
+			count--;
+			usleep_range(10, 12);
+		}
+		geni_status = geni_read_reg(mas->base, SE_GENI_STATUS);
+		dev_err(mas->dev, "%s: Cancel/abort failed:0x%x\n", __func__, geni_status);
+geni_tx_fsm_reset:
+		writel_relaxed(1, mas->base + SE_DMA_TX_FSM_RST);
+		count = MAX_ITER;
+		while (count) {
+			u32 dma_tx_status = geni_read_reg(mas->base, SE_DMA_TX_IRQ_STAT);
+
+			if (dma_tx_status & TX_RESET_DONE) {
+				geni_write_reg(dma_tx_status, mas->base, SE_DMA_TX_IRQ_CLR);
+				SPI_LOG_DBG(mas->ipc, false, mas->dev,
+					    "%s: Tx FSM Reset done\n", __func__);
+				goto exit_geni_check_stop_engine;
+			}
+			count--;
+			usleep_range(10, 12);
+		}
+		dev_err(mas->dev, "%s: DMA TX reset failed\n", __func__);
+	}
+exit_geni_check_stop_engine:
+	SPI_LOG_DBG(mas->ipc, false, mas->dev, "%s: End status:0x%x\n",
+		    __func__, geni_read_reg(mas->base, SE_GENI_STATUS));
+	geni_se_common_clks_off(mas->spi_rsc.clk, mas->m_ahb_clk,
+				mas->s_ahb_clk);
+}
+
+/*
+ * geni_se_handle_common_resources - Get and set the BW vote for all path
+ *
  * @pdev: structure to platform driver.
  * @spi_rsc: structure to geni_se.
  *
@@ -2696,12 +2780,19 @@ static int spi_geni_probe(struct platform_device *pdev)
 	}
 	pm_runtime_enable(&pdev->dev);
 
-	if (!geni_mas->is_le_vm)
+	geni_mas->ipc = ipc_log_context_create(4, dev_name(geni_mas->dev), 0);
+	if (!geni_mas->ipc && IS_ENABLED(CONFIG_IPC_LOGGING))
+		dev_err(&pdev->dev, "Error creating IPC logs\n");
+
+	if (!geni_mas->is_le_vm) {
 		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
 		"%s: GENI_TO_CORE:%d CPU_TO_GENI:%d GENI_TO_DDR:%d\n", __func__,
 		spi_rsc->icc_paths[GENI_TO_CORE].avg_bw,
 		spi_rsc->icc_paths[CPU_TO_GENI].avg_bw,
 		spi_rsc->icc_paths[GENI_TO_DDR].avg_bw);
+
+		geni_check_stop_engine(geni_mas);
+	}
 
 	if (!geni_mas->is_le_vm) {
 		ret = geni_icc_disable(spi_rsc);
@@ -2743,16 +2834,24 @@ spi_geni_probe_err:
 
 static int spi_geni_remove(struct platform_device *pdev)
 {
-	int ret;
+	int ret = 0;
 	struct spi_master *master = platform_get_drvdata(pdev);
 	struct spi_geni_master *geni_mas = spi_master_get_devdata(master);
 
 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_spi_slave_state.attr);
-	geni_se_common_clks_off(geni_mas->spi_rsc.clk, geni_mas->m_ahb_clk, geni_mas->s_ahb_clk);
-	ret = geni_icc_disable(&geni_mas->spi_rsc);
-	if (ret)
-		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
-		"%s failing at geni_icc_disable ret=%d\n", __func__, ret);
+	if (!pm_runtime_status_suspended(&pdev->dev)) {
+		if (list_empty(&master->queue) && !master->cur_msg) {
+			SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
+				    "%s: Force RT suspend\n", __func__);
+			ret = spi_geni_runtime_suspend(&pdev->dev);
+			if (ret) {
+				SPI_LOG_ERR(geni_mas->ipc, false, geni_mas->dev,
+					    "Force RT suspend Failed:%d\n", ret);
+				return -EBUSY;
+			}
+		}
+	}
+
 	spi_unregister_master(master);
 	pm_runtime_put_noidle(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
@@ -2763,6 +2862,20 @@ static int spi_geni_remove(struct platform_device *pdev)
 	device_remove_file(&pdev->dev, &dev_attr_spi_max_dump_size);
 
 	return 0;
+}
+
+/**
+ * spi_geni_shutdown: shutdown call back function for SPI
+ * This will invoke during reboot/shutdown process
+ *
+ * @pdev: SPI platform device
+ *
+ * Return: none
+ */
+static void spi_geni_shutdown(struct platform_device *pdev)
+{
+	dev_info(&pdev->dev, "%s: Entry %d\n", __func__, true);
+	spi_geni_remove(pdev);
 }
 
 #if IS_ENABLED(CONFIG_PM)
@@ -3139,6 +3252,7 @@ static const struct of_device_id spi_geni_dt_match[] = {
 static struct platform_driver spi_geni_driver = {
 	.probe  = spi_geni_probe,
 	.remove = spi_geni_remove,
+	.shutdown = spi_geni_shutdown,
 	.driver = {
 		.name = "spi_geni",
 		.pm = &spi_geni_pm_ops,
