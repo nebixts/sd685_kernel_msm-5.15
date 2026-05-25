@@ -15,6 +15,7 @@
 #include <linux/netdevice.h>
 #include <linux/stmmac.h>
 #include <linux/phy.h>
+#include <linux/pcs-xpcs-qcom.h>
 #include <linux/pcs/pcs-xpcs.h>
 #include <linux/module.h>
 #if IS_ENABLED(CONFIG_VLAN_8021Q)
@@ -26,6 +27,10 @@
 #include "hwif.h"
 #include "mmc.h"
 
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4) || IS_ENABLED(CONFIG_DWMAC_QCOM_VER3)
+#define DMA_OFFLOAD_ENABLE
+#endif
+
 /* Synopsys Core versions */
 #define	DWMAC_CORE_3_40		0x34
 #define	DWMAC_CORE_3_50		0x35
@@ -36,6 +41,7 @@
 #define DWMAC_CORE_5_20		0x52
 #define DWXGMAC_CORE_2_10	0x21
 #define DWXLGMAC_CORE_2_00	0x20
+#define DWXLGMAC_CORE_3_10	0x31
 
 /* Device ID */
 #define DWXGMAC_ID		0x76
@@ -61,11 +67,23 @@
 struct stmmac_txq_stats {
 	unsigned long tx_pkt_n;
 	unsigned long tx_normal_irq_n;
+	unsigned long fatal_bus_error_irq;
+	unsigned long txch_desc_list_laddr;
+	unsigned long txch_desc_ring_len;
+	unsigned long txch_desc_tail;
+	unsigned long tx_buf_unav_irq;
+
 };
 
 struct stmmac_rxq_stats {
 	unsigned long rx_pkt_n;
 	unsigned long rx_normal_irq_n;
+	unsigned long rx_buf_unav_irq;
+	unsigned long rx_process_stopped_irq;
+	unsigned long rxch_desc_list_laddr;
+	unsigned long rxch_desc_ring_len;
+	unsigned long rxch_desc_tail;
+
 };
 
 /* Extra statistic and debug information exposed by ethtool */
@@ -98,6 +116,7 @@ struct stmmac_extra_stats {
 	unsigned long sa_rx_filter_fail;
 	unsigned long rx_missed_cntr;
 	unsigned long rx_overflow_cntr;
+	unsigned long q_rx_overflow_cntr[5];
 	unsigned long rx_vlan;
 	unsigned long rx_split_hdr_pkt_n;
 	/* Tx/Rx IRQ error info */
@@ -110,6 +129,7 @@ struct stmmac_extra_stats {
 	unsigned long rx_watchdog_irq;
 	unsigned long tx_early_irq;
 	unsigned long fatal_bus_error_irq;
+	unsigned long tx_buf_unav_irq;
 	/* Tx/Rx IRQ Events */
 	unsigned long rx_early_irq;
 	unsigned long threshold;
@@ -326,6 +346,7 @@ enum dma_irq_status {
 	tx_hard_error_bump_tc = 0x2,
 	handle_rx = 0x4,
 	handle_tx = 0x8,
+	rbu_err = 0x10,
 };
 
 enum dma_irq_dir {
@@ -345,6 +366,27 @@ enum request_irq_err {
 	REQ_IRQ_ERR_MAC,
 	REQ_IRQ_ERR_NO,
 };
+
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4) || IS_ENABLED(CONFIG_DWMAC_QCOM_VER3)
+enum ipa_queue_type {
+	IPA_QUEUE_BE = 0,
+};
+
+enum ipa_mul_queue_type {
+	IPA_MUL_QUEUE_BE0 = 0,
+	IPA_MUL_QUEUE_BE1 = 1,
+	IPA_MUL_QUEUE_BE2 = 2,
+	IPA_MUL_QUEUE_BE3 = 3,
+};
+
+enum ipa_mul_channel_type {
+	IPA_MUL_CHANNEL_BE0 = 0,
+	IPA_MUL_CHANNEL_BE1 = 1,
+	IPA_MUL_CHANNEL_BE2 = 2,
+	IPA_MUL_CHANNEL_BE3 = 3,
+};
+
+#endif
 
 /* EEE and LPI defines */
 #define	CORE_IRQ_TX_PATH_IN_LPI_MODE	(1 << 0)
@@ -425,6 +467,7 @@ struct dma_features {
 	unsigned int vlins;
 	unsigned int dvlan;
 	unsigned int l3l4fnum;
+	unsigned int nrvf_num;
 	unsigned int arpoffsel;
 	/* TSN Features */
 	unsigned int estwid;
@@ -476,6 +519,11 @@ extern const struct stmmac_desc_ops ndesc_ops;
 
 struct mac_device_info;
 
+struct vlan_filter_info {
+	u16 vlan_id;
+	u32 vlan_offset;
+	u32 rx_queue;
+};
 extern const struct stmmac_hwtimestamp stmmac_ptp;
 extern const struct stmmac_mode_ops dwmac4_ring_mode_ops;
 
@@ -519,6 +567,7 @@ struct mac_device_info {
 	const struct stmmac_tc_ops *tc;
 	const struct stmmac_mmc_ops *mmc;
 	struct dw_xpcs *xpcs;
+	struct dw_xpcs_qcom *qxpcs;
 	struct mii_regs mii;	/* MII register Addresses */
 	struct mac_link link;
 	void __iomem *pcsr;     /* vpointer to device CSRs */
@@ -534,6 +583,7 @@ struct mac_device_info {
 	u32 vlan_filter[32];
 	bool vlan_fail_q_en;
 	u8 vlan_fail_q;
+	bool crc_strip_en;
 };
 
 struct stmmac_rx_routing {
@@ -553,6 +603,10 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
 			 unsigned int high, unsigned int low);
 void stmmac_set_mac(void __iomem *ioaddr, bool enable);
 
+void dwmac4_set_vlan_filter_rx_queue(struct vlan_filter_info *vlan,
+				     void __iomem *ioaddr);
+void dwxgmac2_set_vlan_filter_rx_queue(struct vlan_filter_info *vlan,
+				       void __iomem *ioaddr);
 void stmmac_dwmac4_set_mac_addr(void __iomem *ioaddr, const u8 addr[6],
 				unsigned int high, unsigned int low);
 void stmmac_dwmac4_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
@@ -565,4 +619,17 @@ extern const struct stmmac_mode_ops ring_mode_ops;
 extern const struct stmmac_mode_ops chain_mode_ops;
 extern const struct stmmac_desc_ops dwmac4_desc_ops;
 
+enum mac_err_type {
+	PHY_RW_ERR = 0,
+	PHY_DET_ERR,
+	CRC_ERR,
+	RECEIVE_ERR,
+	OVERFLOW_ERR,
+	FBE_ERR,
+	RBU_ERR,
+	TDU_ERR,
+	DRIBBLE_ERR,
+	WDT_ERR,
+	MAC_ERR_CNT,
+};
 #endif /* __COMMON_H__ */

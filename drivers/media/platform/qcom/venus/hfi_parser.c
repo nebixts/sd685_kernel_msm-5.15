@@ -21,7 +21,12 @@ static void init_codecs(struct venus_core *core)
 
 	core->codecs_count = 0;
 
+<<<<<<< HEAD
 	if (hweight_long(core->dec_codecs) + hweight_long(core->enc_codecs) > MAX_CODEC_NUM)
+=======
+	if (hweight_long(core->dec_codecs) +
+		hweight_long(core->enc_codecs) > MAX_CODEC_NUM)
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 		return;
 
 	for_each_set_bit(bit, &core->dec_codecs, MAX_CODEC_NUM) {

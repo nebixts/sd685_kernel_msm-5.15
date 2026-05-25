@@ -129,6 +129,7 @@ static inline void qcom_scm_populate_mem_map_info(
 extern bool qcom_scm_is_available(void);
 extern void *qcom_get_scm_device(void);
 
+extern int qcom_scm_set_d3w_mode(void);
 extern int qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus);
 extern int qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus);
 extern void qcom_scm_cpu_power_down(u32 flags);
@@ -140,6 +141,7 @@ extern int qcom_scm_spin_cpu(void);
 extern void qcom_scm_set_download_mode(enum qcom_download_mode mode, phys_addr_t tcsr_boot_misc);
 extern int qcom_scm_get_download_mode(unsigned int *mode, phys_addr_t tcsr_boot_misc);
 extern int qcom_scm_config_cpu_errata(void);
+extern void qcom_scm_phy_update_scm_level_shifter(u32 val);
 
 extern int qcom_scm_pas_init_image(u32 peripheral, dma_addr_t metadata);
 extern int qcom_scm_pas_mem_setup(u32 peripheral, phys_addr_t addr,
@@ -147,6 +149,7 @@ extern int qcom_scm_pas_mem_setup(u32 peripheral, phys_addr_t addr,
 extern int qcom_scm_pas_auth_and_reset(u32 peripheral);
 extern int qcom_scm_pas_shutdown(u32 peripheral);
 extern int qcom_scm_pas_shutdown_retry(u32 peripheral);
+extern int qcom_scm_pas_reset(u32 peripheral);
 extern bool qcom_scm_pas_supported(u32 peripheral);
 
 extern int qcom_scm_get_sec_dump_state(u32 *dump_state);
@@ -314,6 +317,13 @@ extern int qcom_scm_lmh_dcvsh(u32 payload_fn, u32 payload_reg, u32 payload_val,
 			      u64 limit_node, u32 node_id, u64 version);
 extern int qcom_scm_lmh_profile_change(u32 profile_id);
 extern bool qcom_scm_lmh_dcvsh_available(void);
+
+extern int qcom_scm_call_ethqos_configure(u32 emac_base_addr, u32 link_speed, u32 if_mode,
+					  phys_addr_t phys_rgmii_hsr_por, u32 len);
+extern int qcom_scm_call_loopback_configure(u32 emac_base_addr, u32 loopback_mode, u32 if_mode);
+extern int qcom_scm_call_iomacro_dump(u32 emac_base_addr, phys_addr_t buffer, u32 len);
+extern int qcom_scm_call_get_emac_maxspeed(u32 emac_base_addr, u32 *maxspeed);
+extern int qcom_scm_call_ipa_intr_config(u32 emac_base_addr, u32 value);
 
 
 #endif

@@ -134,6 +134,11 @@ struct stmmac_rxq_cfg {
 	u8 pkt_route;
 	bool use_prio;
 	u32 prio;
+	bool thresholdmode;
+	u32 threshold_byte;
+	u32 fifo_sz_bytes;
+	bool skip_sw;
+	bool mbcast_route;
 };
 
 struct stmmac_txq_cfg {
@@ -147,6 +152,8 @@ struct stmmac_txq_cfg {
 	bool use_prio;
 	u32 prio;
 	int tbs_en;
+	u32 fifo_sz_bytes;
+	bool skip_sw;
 };
 
 /* FPE link state */
@@ -200,6 +207,19 @@ struct emac_emb_smmu_cb_ctx {
 	int ret;
 };
 
+enum ch_owner {
+	NOT_USED = 0,
+	USE_IN_STMMAC_SW = 1,
+	USE_IN_OFFLOADER = 2,
+};
+
+struct ch_to_tc_map {
+	bool tc_rx_info[MTL_MAX_TX_QUEUES];
+	bool tc_tx_info[MTL_MAX_RX_QUEUES];
+	u32 ch_to_tc_map_tx[MTL_MAX_TX_QUEUES];
+	u32 ch_to_tc_map_rx[MTL_MAX_RX_QUEUES];
+};
+
 struct plat_stmmacenet_data {
 	int bus_id;
 	int phy_addr;
@@ -237,9 +257,16 @@ struct plat_stmmacenet_data {
 	struct stmmac_rxq_cfg rx_queues_cfg[MTL_MAX_RX_QUEUES];
 	struct stmmac_txq_cfg tx_queues_cfg[MTL_MAX_TX_QUEUES];
 	void (*fix_mac_speed)(void *priv, unsigned int speed);
+	void (*xpcs_linkup)(void *priv, unsigned int speed);
 	int (*serdes_powerup)(struct net_device *ndev, void *priv);
 	void (*serdes_powerdown)(struct net_device *ndev, void *priv);
 	void (*speed_mode_2500)(struct net_device *ndev, void *priv);
+	int (*enable_power_saving)(struct net_device *ndev, bool enable);
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+	void (*xpcs_powersaving)(struct net_device *ndev, bool enable);
+#endif
+	int (*serdes_powersaving)(struct net_device *ndev, void *priv, bool power_on,
+	     bool needs_reset);
 	void (*ptp_clk_freq_config)(void *priv);
 	int (*init)(struct platform_device *pdev, void *priv);
 	void (*exit)(struct platform_device *pdev, void *priv);
@@ -249,6 +276,13 @@ struct plat_stmmacenet_data {
 			   void *ctx);
 	void (*dump_debug_regs)(void *priv);
 	unsigned int (*get_eth_type)(unsigned char *buf);
+#if IS_ENABLED(CONFIG_ETHQOS_QCOM_VER4)
+	void (*set_skb_prio)(void *priv_n, struct sk_buff *skb, u32 queue);
+	bool (*is_skprio_routing)(void *priv);
+#endif
+	int (*enable_wol)(struct net_device *ndev, struct ethtool_wolinfo *wol);
+	int (*release_dma_resources)(struct net_device *ndev);
+	int (*request_dma_resources)(struct net_device *ndev);
 	void *bsp_priv;
 	struct clk *stmmac_clk;
 	struct clk *pclk;
@@ -260,6 +294,9 @@ struct plat_stmmacenet_data {
 	s32 ptp_max_adj;
 	struct reset_control *stmmac_rst;
 	struct reset_control *stmmac_ahb_rst;
+	struct reset_control *rgmii_rst;
+	struct gpio_desc *reset_phy1_gpio;
+	bool is_valid_eth_intf;
 	struct stmmac_axi *axi;
 	int has_gmac4;
 	bool has_sun8i;
@@ -287,25 +324,62 @@ struct plat_stmmacenet_data {
 	int msi_rx_base_vec;
 	int msi_tx_base_vec;
 	bool use_phy_wol;
+	enum ch_owner tx_dma_ch_owner[MTL_MAX_TX_QUEUES];
+	enum ch_owner rx_dma_ch_owner[MTL_MAX_RX_QUEUES];
 	struct emac_emb_smmu_cb_ctx stmmac_emb_smmu_ctx;
 	bool phy_intr_en_extn_stm;
 	int has_c22_mdio_probe_capability;
+	int has_c45_mdio_probe_capability;
 	u16	(*tx_select_queue)
 		(struct net_device *dev, struct sk_buff *skb,
 		 struct net_device *sb_dev);
 	unsigned int (*get_plat_tx_coal_frames)
 		(struct sk_buff *skb);
+	int (*handle_mac_err)(void *priv, int type, int chan);
 	int (*handle_prv_ioctl)(struct net_device *dev, struct ifreq *ifr,
 		int cmd);
 	void (*request_phy_wol)(void *plat);
 	int (*init_pps)(void *priv);
-	int mac2mac_rgmii_speed;
-	bool mac2mac_en;
+	int mac2mac_speed;
+	u32 mac2mac_en;
 	int mac2mac_link;
 	bool early_eth;
 	bool sph_disable;
 	void (*phy_irq_enable)(void *priv);
 	void (*phy_irq_disable)(void *priv);
+<<<<<<< HEAD
 	int disable_pcs_ane;
+=======
+	void (*wol_irq_enable)(void *priv);
+	void (*wol_irq_disable)(void *priv);
+	int port_num;
+	bool pcs_v3;
+	bool pm_lite;
+	bool fixed_phy_mode;
+	int fixed_phy_speed;
+	int max_supported_speed;
+	bool fixed_phy_mode_needs_mdio;
+	bool crc_strip_en;
+	bool plat_wait_for_emac_rx_clk_en;
+	bool rx_clk_rdy;
+	bool mac_err_rec;
+	bool mdio_op_busy;
+	atomic_t phy_clks_suspended;
+	struct completion mdio_op;
+	bool mac_suspended;
+	bool separate_wol_pin;
+	bool mka_mcbcq_filtering;
+	bool probe_invoke_if_up;
+	int rx_qos_queues_to_use;
+	int tx_qos_queues_to_use;
+	bool is_config_supp;
+	char qoscfg[4];
+	bool qos_active;
+	struct ch_to_tc_map qos_ch_map;
+	bool enable_pfc;
+	bool qos_use_skprio;
+	bool qos_supported;
+	bool enable_aux_ts;
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 };
 #endif

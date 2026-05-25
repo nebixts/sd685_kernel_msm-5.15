@@ -492,7 +492,7 @@ static int xfrm_output_one(struct sk_buff *skb, int err)
 	struct xfrm_state *x = dst->xfrm;
 	struct net *net = xs_net(x);
 
-	if (err <= 0)
+	if (err <= 0 || x->xso.type == XFRM_DEV_OFFLOAD_PACKET)
 		goto resume;
 
 	do {
@@ -582,13 +582,51 @@ out:
 int xfrm_output_resume(struct sk_buff *skb, int err)
 {
 	struct net *net = xs_net(skb_dst(skb)->xfrm);
+	struct rt6_info	*rt6 = NULL, *rt6_new = NULL;
+
+	// Save the IPv6 route before the xdst is stripped
+	if (skb_dst(skb)->xfrm && skb_dst(skb)->ops->family == AF_INET6)
+		rt6 = xfrm_dst_rt6(dst_clone(skb_dst(skb)));
 
 	while (likely((err = xfrm_output_one(skb, err)) == 0)) {
 		nf_reset_ct(skb);
 
-		err = skb_dst(skb)->ops->local_out(net, skb->sk, skb);
-		if (unlikely(err != 1))
-			goto out;
+		if (skb_dst(skb)->ops->family != AF_INET && ip_hdr(skb)->version == 4) {
+			if (rt6)
+				dst_release(&rt6->dst);
+			memset(IPCB(skb), 0, sizeof(*IPCB(skb)));
+			IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
+			err = ip_output(net, skb->sk, skb);
+			if (unlikely(err != 1))
+				goto out;
+		} else if (rt6 && skb_dst(skb)->ops->family != AF_INET6 &&
+			   ip_hdr(skb)->version == 6) {
+			// The ip6_output etc. will use the IPv6 routing info,
+			// thus we extend the skb dst with the saved rt6.
+			rt6_new = ip6_dst_alloc(net, skb->dev, DST_NOPOLICY | DST_NOXFRM);
+			if (!rt6_new) {
+				err = -ENOMEM;
+				goto out;
+			}
+			memcpy(rt6_new, rt6, sizeof(struct rt6_info));
+			memcpy(&rt6_new->dst, skb_dst(skb), sizeof(struct dst_entry));
+			skb_dst_drop(skb);
+			skb_dst_set(skb, &rt6_new->dst);
+			dst_release(&rt6->dst);
+
+			memset(IP6CB(skb), 0, sizeof(*IP6CB(skb)));
+			IP6CB(skb)->flags |= IP6SKB_XFRM_TRANSFORMED;
+
+			err = ip6_output(net, skb->sk, skb);
+			if (unlikely(err != 1))
+				goto out;
+		} else {
+			if (rt6)
+				dst_release(&rt6->dst);
+			err = skb_dst(skb)->ops->local_out(net, skb->sk, skb);
+			if (unlikely(err != 1))
+				goto out;
+		}
 
 		if (!skb_dst(skb)->xfrm)
 			return dst_output(net, skb->sk, skb);
@@ -702,9 +740,13 @@ int xfrm_output(struct sock *sk, struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb_dst(skb)->dev);
 	struct xfrm_state *x = skb_dst(skb)->xfrm;
+	int family;
 	int err;
 
-	switch (x->outer_mode.family) {
+	family = (x->xso.type != XFRM_DEV_OFFLOAD_PACKET) ? x->outer_mode.family
+		: skb_dst(skb)->ops->family;
+
+	switch (family) {
 	case AF_INET:
 		memset(IPCB(skb), 0, sizeof(*IPCB(skb)));
 		IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
@@ -714,6 +756,16 @@ int xfrm_output(struct sock *sk, struct sk_buff *skb)
 
 		IP6CB(skb)->flags |= IP6SKB_XFRM_TRANSFORMED;
 		break;
+	}
+
+	if (x->xso.type == XFRM_DEV_OFFLOAD_PACKET) {
+		if (!xfrm_dev_offload_ok(skb, x)) {
+			XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTERROR);
+			kfree_skb(skb);
+			return -EHOSTUNREACH;
+		}
+
+		return xfrm_output_resume(skb, 0);
 	}
 
 	secpath_reset(skb);

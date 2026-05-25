@@ -8,10 +8,11 @@
 #define _LINUX_QCOM_GENI_SE_COMMON
 #include <linux/clk.h>
 #include <linux/dma-direction.h>
-#include <linux/io.h>
 #include <linux/dma-mapping.h>
-#include <linux/sched/clock.h>
+#include <linux/io.h>
 #include <linux/ipc_logging.h>
+#include <linux/math64.h>
+#include <linux/sched/clock.h>
 
 #ifdef CONFIG_ARM64
 #define GENI_SE_DMA_PTR_L(ptr) ((u32)ptr)
@@ -70,14 +71,20 @@ if (print) { \
 #define SE_DMA_RX_LEN			(0xD3C)
 #define SE_DMA_RX_IRQ_EN                (0xD48)
 #define SE_DMA_RX_LEN_IN                (0xD54)
+#define SE_DMA_IF_EN			(0x2004)
 #define M_IRQ_ENABLE			(0x614)
 #define M_CMD_ERR_STATUS		(0x624)
 #define M_FW_ERR_STATUS			(0x628)
 #define M_GP_LENGTH			(0x910)
 #define S_GP_LENGTH			(0x914)
 #define SE_DMA_DEBUG_REG0		(0xE40)
+<<<<<<< HEAD
 #define SE_DMA_IF_EN			(0x004)
 #define GENI_CLK_CTRL_RO                (0x60)
+=======
+#define SE_GENI_CLK_CTRL		(0x2000)
+#define SE_FIFO_IF_DISABLE		(0x2008)
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 #define SE_GENI_GENERAL_CFG		(0x10)
 #define SE_DMA_TX_ATTR			(0xC38)
 #define SE_DMA_TX_MAX_BURST		(0xC5C)
@@ -149,6 +156,8 @@ if (print) { \
 #define IO_MACRO_IO2_SEL	BIT(5)
 #define IO_MACRO_IO0_SEL_BIT	BIT(0)
 
+/* SE_DMA_IF_EN Register fields */
+#define DMA_IF_EN			BIT(0)
 #define TOTAL_VOTE_INDEX	3
 #define VOTE_INDEX_PROP_NAME "qcom,vote-index"
 #define GENI_TO_CORE_VOTE_PROP_NAME "qcom,geni-to-core-vote"
@@ -568,8 +577,7 @@ static inline void geni_se_common_get_major_minor_num(u32 hw_version,
  * test_bus_enable_per_qupv3: enables particular test bus number.
  * @wrapper_dev: QUPV3 common driver handle from SE driver
  *
- * Note: Need to call only once.
- *
+ * Note : Need to call only once.
  * Return: none
  */
 static inline void test_bus_enable_per_qupv3(struct device *wrapper_dev, void *ipc)
@@ -590,8 +598,7 @@ static inline void test_bus_enable_per_qupv3(struct device *wrapper_dev, void *i
  * test_bus_select_per_qupv3: Selects the test bus as required
  * @wrapper_dev: QUPV3 common driver handle from SE driver
  * @test_bus_num: GENI SE number from QUPV3 core. E.g. SE0 should pass value 1.
- *
- * @Return: None
+ * @Return:     None
  */
 static inline void test_bus_select_per_qupv3(struct device *wrapper_dev, u8 test_bus_num, void *ipc)
 {
@@ -608,9 +615,8 @@ static inline void test_bus_select_per_qupv3(struct device *wrapper_dev, u8 test
 
 /*
  * test_bus_read_per_qupv3: Selects the test bus as required
- * @wrapper_dev: QUPV3 common driver handle from SE driver
- *
- * Return: None
+ * @wrapper_dev:        QUPV3 common driver handle from SE driver
+ * Return:              None
  */
 static inline void test_bus_read_per_qupv3(struct device *wrapper_dev, void *ipc)
 {
@@ -642,7 +648,7 @@ static inline unsigned long long geni_capture_start_time(struct geni_se *se, voi
 		start_time = sched_clock();
 		GENI_SE_ERR(ipc, false, dev,
 			    "%s:start at %llu nsec(%llu usec)\n", func,
-			    start_time, (start_time / 1000));
+			    start_time, div_u64(start_time, NSEC_PER_USEC));
 	}
 	return start_time;
 }
@@ -671,15 +677,15 @@ static inline void geni_capture_stop_time(struct geni_se *se, void *ipc,
 		if (len == 0)
 			GENI_SE_ERR(ipc, false, dev,
 				    "%s:took %llu nsec(%llu usec)\n",
-				    func, exec_time, (exec_time / 1000));
+				    func, exec_time, div_u64(exec_time, NSEC_PER_USEC));
 		else if (len != 0 && freq != 0)
 			GENI_SE_ERR(ipc, false, dev,
 				    "%s:took %llu nsec(%llu usec) for %d bytes with freq %d\n",
-				    func, exec_time, (exec_time / 1000), len, freq);
+				    func, exec_time, div_u64(exec_time, NSEC_PER_USEC), len, freq);
 		else
 			GENI_SE_ERR(ipc, false, dev,
 				    "%s:took %llu nsec(%llu usec) for %d bytes\n", func,
-				    exec_time, (exec_time / 1000), len);
+				    exec_time, div_u64(exec_time, NSEC_PER_USEC), len);
 	}
 }
 #endif

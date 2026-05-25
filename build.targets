@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 build.config.msm.kalama
 build.config.msm.kalama.le
 build.config.msm.kalamale.roboticsvm
@@ -15,3 +16,11 @@ build.config.msm.kona
 build.config.msm.kona.le
 build.config.msm.qcs405
 build.config.msm.trinket
+=======
+build.config.msm.cinder
+build.config.msm.sdxpinn
+build.config.msm.sdxpinn-cpe-wkk
+build.config.msm.sdxpinn-prpl
+build.config.msm.sdxpinn-rdkb
+build.config.msm.sdxbaagha
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel

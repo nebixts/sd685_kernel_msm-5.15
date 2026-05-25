@@ -113,6 +113,7 @@ struct gs_port {
 	int read_started;
 	int read_allocated;
 	struct list_head	read_queue;
+	struct list_head	read_ep_queued;
 	unsigned		n_read;
 	struct delayed_work	push;
 
@@ -258,7 +259,7 @@ __acquires(&port->port_lock)
 		do_tty_wake = true;
 
 		req->length = len;
-		list_del(&req->list);
+		list_del_init(&req->list);
 		req->zero = kfifo_is_empty(&port->port_write_buf);
 
 		pr_vdebug("ttyGS%d: tx len=%d, %3ph ...\n", port->port_num, len, req->buf);
@@ -321,7 +322,7 @@ __acquires(&port->port_lock)
 			break;
 
 		req = list_entry(pool->next, struct usb_request, list);
-		list_del(&req->list);
+		list_del_init(&req->list);
 		req->length = out->maxpacket;
 
 		/* drop lock while we call out; the controller driver
@@ -336,7 +337,10 @@ __acquires(&port->port_lock)
 					__func__, "queue", out->name, status);
 			list_add(&req->list, pool);
 			break;
+		} else {
+			list_add_tail(&req->list, &port->read_ep_queued);
 		}
+
 		port->read_started++;
 
 		/* abort immediately after disconnect */
@@ -382,6 +386,12 @@ static void gs_rx_push(struct work_struct *work)
 			disconnect = true;
 			pr_vdebug("ttyGS%d: shutdown\n", port->port_num);
 			break;
+		case -ECONNRESET:
+			if (port->suspended) {
+				pr_vdebug("ttyGS%d: suspend\n", port->port_num);
+				break;
+			}
+			fallthrough;
 
 		default:
 			/* presumably a transient fault */
@@ -453,8 +463,25 @@ static void gs_read_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct gs_port	*port = ep->driver_data;
 
-	/* Queue all received data until the tty layer is ready for it. */
 	spin_lock(&port->port_lock);
+	if (!port->port_usb)  {
+		spin_unlock(&port->port_lock);
+		return;
+	}
+
+	if (port->suspended) {
+		/* Read complete received as part of dequeue, so add it back to read_pool */
+		list_add_tail(&req->list, &port->read_pool);
+		port->read_started--;
+		spin_unlock(&port->port_lock);
+		return;
+	}
+
+	/* Make sure to delete req if it was already added to read_ep_queued */
+	if (!list_empty(&req->list))
+		list_del_init(&req->list);
+
+	/* Queue all received data until the tty layer is ready for it. */
 	list_add_tail(&req->list, &port->read_queue);
 	schedule_delayed_work(&port->push, 0);
 	spin_unlock(&port->port_lock);
@@ -580,6 +607,14 @@ static int gs_start_io(struct gs_port *port)
 	}
 
 	return status;
+}
+
+static int gserial_wakeup_host(struct gserial *gser)
+{
+	struct usb_function	*func = &gser->func;
+	struct usb_gadget	*gadget = func->config->cdev->gadget;
+
+	return usb_gadget_wakeup(gadget);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -735,7 +770,9 @@ exit:
 static int gs_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	struct gs_port	*port = tty->driver_data;
+	struct gserial  *gser = port->port_usb;
 	unsigned long	flags;
+	int ret = 0;
 
 	pr_vdebug("gs_write: ttyGS%d (%p) writing %d bytes\n",
 			port->port_num, tty, count);
@@ -743,6 +780,17 @@ static int gs_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	spin_lock_irqsave(&port->port_lock, flags);
 	if (count)
 		count = kfifo_in(&port->port_write_buf, buf, count);
+
+	if (port->suspended) {
+		spin_unlock_irqrestore(&port->port_lock, flags);
+		ret = gserial_wakeup_host(gser);
+		if (ret) {
+			pr_err("ttyGS%d: Remote wakeup failed:%d\n", port->port_num, ret);
+			return count;
+		}
+		spin_lock_irqsave(&port->port_lock, flags);
+	}
+
 	/* treat count == 0 as flush_chars() */
 	if (port->port_usb)
 		gs_start_tx(port);
@@ -770,9 +818,19 @@ static int gs_put_char(struct tty_struct *tty, unsigned char ch)
 static void gs_flush_chars(struct tty_struct *tty)
 {
 	struct gs_port	*port = tty->driver_data;
+	struct gserial  *gser = port->port_usb;
 	unsigned long	flags;
+	int ret = 0;
 
 	pr_vdebug("gs_flush_chars: (%d,%p)\n", port->port_num, tty);
+
+	if (port->suspended) {
+		ret = gserial_wakeup_host(gser);
+		if (ret) {
+			pr_err("ttyGS%d: Remote wakeup failed:%d\n", port->port_num, ret);
+			return;
+		}
+	}
 
 	spin_lock_irqsave(&port->port_lock, flags);
 	if (port->port_usb)
@@ -1162,15 +1220,19 @@ gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
 	}
 
 	tty_port_init(&port->port);
+	tty_buffer_set_limit(&port->port, 8388608);
 	spin_lock_init(&port->port_lock);
 	init_waitqueue_head(&port->drain_wait);
 	init_waitqueue_head(&port->close_wait);
 
-	INIT_DELAYED_WORK(&port->push, gs_rx_push);
+	pr_debug("%s open:ttyGS%d and set 8388608, avail:%d\n", __func__,
+		port_num, tty_buffer_space_avail(&port->port));
 
+	INIT_DELAYED_WORK(&port->push, gs_rx_push);
 	INIT_LIST_HEAD(&port->read_pool);
 	INIT_LIST_HEAD(&port->read_queue);
 	INIT_LIST_HEAD(&port->write_pool);
+	INIT_LIST_HEAD(&port->read_ep_queued);
 
 	port->port_num = port_num;
 	port->port_line_coding = *coding;
@@ -1412,8 +1474,10 @@ void gserial_disconnect(struct gserial *gser)
 	spin_lock_irqsave(&port->port_lock, flags);
 	if (port->port.count == 0)
 		kfifo_free(&port->port_write_buf);
+
 	gs_free_requests(gser->out, &port->read_pool, NULL);
 	gs_free_requests(gser->out, &port->read_queue, NULL);
+	gs_free_requests(gser->out, &port->read_ep_queued, NULL);
 	gs_free_requests(gser->in, &port->write_pool, NULL);
 
 	port->read_allocated = port->read_started =
@@ -1427,6 +1491,9 @@ void gserial_suspend(struct gserial *gser)
 {
 	struct gs_port	*port;
 	unsigned long	flags;
+	struct list_head	*pool;
+	struct usb_ep		*out;
+	struct usb_request	*req;
 
 	spin_lock_irqsave(&serial_port_lock, flags);
 	port = gser->ioport;
@@ -1436,10 +1503,30 @@ void gserial_suspend(struct gserial *gser)
 		return;
 	}
 
+	if (port->write_busy || port->write_started) {
+		/* Issue a remote wakeup to host if there are ongoing transfers */
+		spin_unlock_irqrestore(&serial_port_lock, flags);
+		gserial_wakeup_host(gser);
+		return;
+	}
+
 	spin_lock(&port->port_lock);
-	spin_unlock(&serial_port_lock);
+
 	port->suspended = true;
 	port->start_delayed = true;
+	pool = &port->read_ep_queued;
+	out = port->port_usb->out;
+	while (!list_empty(pool)) {
+		req = list_entry(pool->next, struct usb_request, list);
+		if (req) {
+			list_del_init(&req->list);
+			spin_unlock_irqrestore(&port->port_lock, flags);
+			usb_ep_dequeue(out, req);
+			spin_lock_irqsave(&port->port_lock, flags);
+		}
+	}
+
+	spin_unlock(&serial_port_lock);
 	spin_unlock_irqrestore(&port->port_lock, flags);
 }
 EXPORT_SYMBOL_GPL(gserial_suspend);

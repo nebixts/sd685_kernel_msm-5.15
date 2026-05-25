@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __GH_RM_DRV_PRIVATE_H
@@ -87,9 +87,11 @@ struct gh_vm_property {
 #define GH_RM_RPC_MSG_ID_CALL_VM_LOOKUP_GUID		0x56000012
 #define GH_RM_RPC_MSG_ID_CALL_VM_LOOKUP_NAME		0x56000013
 #define GH_RM_RPC_MSG_ID_CALL_VM_GET_STATE		0x56000017
+#define GH_RM_RPC_MSG_ID_CALL_VM_GET_CRASH_MSG		0x56000019
 #define GH_RM_RPC_MSG_ID_CALL_VM_GET_HYP_RESOURCES	0x56000020
 #define GH_RM_RPC_MSG_ID_CALL_VM_LOOKUP_HYP_CAPIDS	0x56000021
 #define GH_RM_RPC_MSG_ID_CALL_VM_LOOKUP_HYP_IRQS	0X56000022
+#define GH_RM_RPC_MSG_ID_CALL_VM_GET_VMID		0x56000024
 
 /* Message IDs: vRTC Configuration */
 #define GH_RM_RPC_MSG_ID_CALL_VM_SET_TIME_BASE		0x56000030
@@ -113,6 +115,7 @@ struct gh_vm_property {
 #define GH_RM_RPC_MSG_ID_CALL_VM_CONSOLE_CLOSE		0x56000082
 #define GH_RM_RPC_MSG_ID_CALL_VM_CONSOLE_WRITE		0x56000083
 #define GH_RM_RPC_MSG_ID_CALL_VM_CONSOLE_FLUSH		0x56000084
+#define GH_RM_RPC_MSG_ID_CALL_VM_SET_CRASH_MSG		0x56000086
 
 /* Message IDs: VM-Host Query */
 #define GH_RM_RPC_MSG_ID_CALL_VM_HOST_GET_TYPE		0x560000A0
@@ -216,6 +219,25 @@ struct gh_vm_console_common_req_payload {
 struct gh_vm_console_write_req_payload {
 	gh_vmid_t vmid;
 	u16 num_bytes;
+	u8 data[0];
+} __packed;
+
+/* Call: VM_SET_CRASH_MSG */
+struct gh_vm_set_crash_msg_req_payload {
+	u16 msg_size;
+	u16 reserved;
+	u8 data[0];
+} __packed;
+
+/* Call: VM_GET_CRASH_MSG */
+struct gh_vm_get_crash_msg_req_payload {
+	gh_vmid_t vmid;
+	u16 reserved;
+} __packed;
+
+struct gh_vm_get_crash_msg_resp_payload {
+	u16 msg_size;
+	u16 reserved;
 	u8 data[0];
 } __packed;
 
@@ -502,6 +524,9 @@ void gh_init_vm_prop_table(void);
 int gh_update_vm_prop_table(enum gh_vm_names vm_name,
 			struct gh_vm_property *vm_prop);
 void *gh_rm_call(gh_rm_msgid_t message_id,
+			void *req_buff, size_t req_buff_size,
+			size_t *resp_buff_size, int *reply_err_code);
+void *gh_rm_call_noblock(gh_rm_msgid_t message_id,
 			void *req_buff, size_t req_buff_size,
 			size_t *resp_buff_size, int *reply_err_code);
 struct gh_vm_get_id_resp_entry *

@@ -672,7 +672,6 @@ void cfg80211_mlme_purge_registrations(struct wireless_dev *wdev)
 static bool cfg80211_allowed_address(struct wireless_dev *wdev, const u8 *addr)
 {
 	int i;
-
 	for_each_valid_link(wdev, i) {
 		if (ether_addr_equal(addr, wdev->links[i].addr))
 			return true;

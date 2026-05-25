@@ -22,8 +22,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/suspend.h>
 #include <linux/ipc_logging.h>
-#include "slatecom.h"
 #include <linux/soc/qcom/slatecom_interface.h>
+#include "slatecom.h"
 
 #define SLATE_SPI_WORD_SIZE (0x04)
 #define SLATE_SPI_READ_LEN (0x04)

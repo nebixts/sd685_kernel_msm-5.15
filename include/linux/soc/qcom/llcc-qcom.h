@@ -126,6 +126,16 @@ struct llcc_drv_data {
 };
 
 /**
+ * llcc_tcm_data - Data associated with the llcc tcm driver
+ *
+ */
+struct llcc_tcm_data {
+	phys_addr_t phys_addr;
+	void __iomem *virt_addr;
+	size_t mem_size;
+};
+
+/**
  * Enum describing the various staling modes available for clients to use.
  */
 enum llcc_staling_mode {
@@ -189,25 +199,30 @@ int llcc_slice_activate(struct llcc_slice_desc *desc);
 int llcc_slice_deactivate(struct llcc_slice_desc *desc);
 
 /**
- * llcc_configure_staling_mode - Configure cache staling mode by setting the
- *				 staling_mode and corresponding
- *				 mode-specific params
- *
- * @desc: Pointer to llcc slice descriptor
- * @p: Staling mode-specific params
- *
- * Returns: zero on success or negative errno.
+ * llcc_tcm_activate - Activate llcc tcm
  */
-int llcc_configure_staling_mode(struct llcc_slice_desc *desc,
-				struct llcc_staling_mode_params *p);
+struct llcc_tcm_data *llcc_tcm_activate(void);
+
 /**
- * llcc_notif_staling_inc_counter - Trigger the staling of the sub-cache frame.
- *
- * @desc: Pointer to llcc slice descriptor
- *
- * Returns: zero on success or negative errno.
+ * llcc_tcm_get_phys_addr - get the physical address of llcc tcm slice
  */
-int llcc_notif_staling_inc_counter(struct llcc_slice_desc *desc);
+phys_addr_t llcc_tcm_get_phys_addr(struct llcc_tcm_data *tcm_data);
+
+/**
+ * llcc_tcm_get_virt_addr - get the virtual address of llcc tcm slice
+ */
+void __iomem *llcc_tcm_get_virt_addr(struct llcc_tcm_data *tcm_data);
+
+/**
+ * llcc_tcm_get_slice_size - get the llcc tcm slice size
+ */
+size_t llcc_tcm_get_slice_size(struct llcc_tcm_data *tcm_data);
+
+/**
+ * llcc_tcm_deactivate - Deactivate the llcc tcm
+ */
+void llcc_tcm_deactivate(struct llcc_tcm_data *tcm_data);
+
 #else
 static inline struct llcc_slice_desc *llcc_slice_getd(u32 uid)
 {
@@ -228,6 +243,7 @@ static inline size_t llcc_get_slice_size(struct llcc_slice_desc *desc)
 {
 	return 0;
 }
+
 static inline int llcc_slice_activate(struct llcc_slice_desc *desc)
 {
 	return -EINVAL;
@@ -242,9 +258,35 @@ static inline int llcc_configure_staling_mode(struct llcc_slice_desc *desc,
 {
 	return -EINVAL;
 }
+
 static inline int llcc_notif_staling_inc_counter(struct llcc_slice_desc *desc)
 {
 	return -EINVAL;
+}
+
+static inline struct llcc_tcm_data *llcc_tcm_activate(void)
+{
+	return NULL;
+}
+
+static inline phys_addr_t llcc_tcm_get_phys_addr(struct llcc_tcm_data *tcm_data)
+{
+	return 0;
+}
+
+static inline void __iomem *llcc_tcm_get_virt_addr(struct llcc_tcm_data *tcm_data)
+{
+	return NULL;
+}
+
+static inline size_t llcc_tcm_get_slice_size(struct llcc_tcm_data *tcm_data)
+{
+	return 0;
+}
+
+static inline void llcc_tcm_deactivate(struct llcc_tcm_data *tcm_data)
+{
+
 }
 #endif
 

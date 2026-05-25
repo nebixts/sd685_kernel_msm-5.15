@@ -9,6 +9,8 @@ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
 	      stmmac_xdp.o \
 	      $(stmmac-y)
 
+stmmac-$(CONFIG_ETHQOS_QCOM_HOSTVM) += dwmac-qcom-msgq-pvm.o
+
 stmmac-$(CONFIG_STMMAC_SELFTESTS) += stmmac_selftests.o
 
 # Ordering matters. Generic driver must be last.
@@ -22,7 +24,8 @@ obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o dwmac-meson8b.o
 obj-$(CONFIG_DWMAC_OXNAS)	+= dwmac-oxnas.o
 obj-$(CONFIG_DWMAC_QCOM_ETHQOS) += dwmac-qcom-eth.o
 dwmac-qcom-eth-objs := dwmac-qcom-ethqos.o dwmac-qcom-gpio.o dwmac-qcom-pps.o
-dwmac-qcom-eth-$(CONFIG_ETHQOS_QCOM_SERDES) += dwmac-qcom-serdes.o
+obj-$(CONFIG_ETHQOS_QCOM_SERDES) += dwmac-qcom-serdes.o
+obj-$(CONFIG_PCS_QCOM) += dwmac-qcom-xpcs.o
 obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
 obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-altr-socfpga.o
 obj-$(CONFIG_DWMAC_STI)		+= dwmac-sti.o
