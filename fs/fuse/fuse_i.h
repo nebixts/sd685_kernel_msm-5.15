@@ -427,6 +427,7 @@ enum fuse_req_flag {
 	FR_FINISHED,
 	FR_PRIVATE,
 	FR_ASYNC,
+    FR_INTR_QUEUED
 };
 
 /**
