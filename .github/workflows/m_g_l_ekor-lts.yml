@@ -34,7 +34,7 @@ jobs:
         id: merge_step
         run: |
           # Matches android13-5.15.X_r00 LTS tags precisely
-          LATEST_TAG=$(git tag -l "android13-5.15.*_r*" | sort -V | tail -n 1)
+          LATEST_TAG=$(git tag -l "android13-5.15.208_r*" | sort -V | tail -n 1)
           echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           
           if [ -z "$LATEST_TAG" ]; then
