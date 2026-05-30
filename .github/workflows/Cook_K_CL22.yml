@@ -32,7 +32,7 @@ on:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
         type: string
-        default: "-NeFaRiaN-3.5-G-29052026"
+        default: "-NeFaRiaN-3.5-G-30052026"
       buildKSU:
         description: "Build KSU variant?"
         required: true
@@ -46,7 +46,7 @@ on:
         description: "KSU implementation (if KSU enabled)"
         required: true
         type: choice
-        default: "RESUKISU"
+        default: "NEXT"
         options:
           - "KERNELSU"
           - "NEXT"
@@ -456,14 +456,7 @@ jobs:
           EOF
         
           apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
-
-          IPNAT_FIX="https://raw.githubusercontent.com/nebixts/kernel_patches/main/IPv6_NAT_FIX.patch"
-          if [ -f "$IPNAT_FIX" ]; then
-            patch -p1 < "$IPNAT_FIX" || true
-            echo "✅ IPv6 NAT fix patch applied"
-          else
-            echo "⚠️ IPv6 NAT FIX patch not found, skipping"
-          fi
+          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/IPv6_NAT_FIX.patch"
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
           echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
