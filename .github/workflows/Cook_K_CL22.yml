@@ -390,8 +390,6 @@ jobs:
           CONFIG_TCP_CONG_HTCP=y
           CONFIG_TCP_CONG_BBR=y
           CONFIG_DEFAULT_WESTWOOD=y
-          CONFIG_NET_SCH_FQ=y
-          CONFIG_NET_SCH_FQ_CODEL=y
           EOF
           
           cat >> "$CONFIG_FILE" << 'EOF'
@@ -421,42 +419,9 @@ jobs:
           CONFIG_IP_SET_LIST_SET=y
           CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
           CONFIG_NETFILTER_XT_SET=y
-          CONFIG_IP6_NF_NAT=y
-          CONFIG_IP6_NF_TARGET_MASQUERADE=y
-          EOF
-          
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_F2FS_FS=y
-          CONFIG_F2FS_STAT_FS=y
-          CONFIG_F2FS_FS_XATTR=y
-          CONFIG_F2FS_FS_POSIX_ACL=y
-          CONFIG_F2FS_FS_SECURITY=y
-          CONFIG_F2FS_FS_COMPRESSION=y
-          CONFIG_F2FS_FS_LZO=y
-          CONFIG_F2FS_FS_LZ4=y
-          CONFIG_F2FS_FS_ZSTD=y
-          EOF
-          
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_NF_CONNTRACK=y
-          CONFIG_NF_CONNTRACK_MARK=y
-          CONFIG_NF_CONNTRACK_ZONES=y
-          CONFIG_NF_CONNTRACK_TIMESTAMP=y
-          CONFIG_NF_CONNTRACK_EVENTS=y
-          CONFIG_NF_CONNTRACK_TIMEOUT=y
-          CONFIG_NF_CONNTRACK_LABELS=y
-          CONFIG_NF_NAT=y
-          CONFIG_NF_NAT_MASQUERADE=y
-          CONFIG_NETFILTER_XT_MATCH_HASHLIMIT=y
-          CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
-          CONFIG_NETFILTER_XT_MATCH_CONNLIMIT=y
-          CONFIG_NETFILTER_XT_MATCH_STATE=y
-          CONFIG_NETFILTER_XT_TARGET_MASQUERADE=y
-          CONFIG_NETFILTER_XT_TARGET_REDIRECT=y
           EOF
         
           apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/0001-scripts-sign-builds.patch"
-          apply_patch "https://raw.githubusercontent.com/nebixts/kernel_patches/main/IPv6_NAT_FIX.patch"
           
           echo "✅ Applied -${{ github.event.inputs.optimizationLevel }} Optimization"
           echo "✅ Applied ${{ github.event.inputs.tickRate }}Hz tick rate"
@@ -464,9 +429,6 @@ jobs:
           echo "✅ Applied Extra TCP configs"
           echo "✅ Applied Networking Configuration"
           echo "✅ Applied IPSet Support"
-          echo "✅ Applied Enabling F2FS optimizations..."
-          echo "✅ Applied Enabling full Netfilter support..."
-
 
       - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.variant == 'ksu' && github.event.inputs.bbg == 'on'
