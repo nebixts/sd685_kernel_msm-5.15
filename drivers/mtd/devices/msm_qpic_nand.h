@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __QPIC_NAND_H
@@ -30,6 +30,8 @@
 #include <linux/msm-sps.h>
 #include <linux/soc/qcom/smem.h>
 #include <linux/interconnect.h>
+#include <linux/suspend.h>
+#include <linux/nvmem-consumer.h>
 
 #define PAGE_SIZE_2K 2048
 #define PAGE_SIZE_4K 4096
@@ -155,7 +157,10 @@
 #define RESET_ERASED_DET	(1 << AUTO_DETECT_RES)
 #define ACTIVE_ERASED_DET	(0 << AUTO_DETECT_RES)
 #define CLR_ERASED_PAGE_DET	(RESET_ERASED_DET | MASK_ECC)
-#define SET_ERASED_PAGE_DET	(ACTIVE_ERASED_DET | MASK_ECC)
+#define SET_ERASED_PAGE_DET	(ACTIVE_ERASED_DET | MASK_ECC | SET_N_MAX_ZEROS)
+#define N_MAX_ZEROS		2
+#define MAX_ECC_BIT_FLIPS       4
+#define SET_N_MAX_ZEROS		(MAX_ECC_BIT_FLIPS << N_MAX_ZEROS)
 
 #define MSM_NAND_ERASED_CW_DETECT_STATUS(info)  MSM_NAND_REG(info, 0x300EC)
 #define PAGE_ALL_ERASED		7
@@ -164,15 +169,19 @@
 #define CODEWORD_ERASED		4
 #define ERASED_PAGE	((1 << PAGE_ALL_ERASED) | (1 << PAGE_ERASED))
 #define ERASED_CW	((1 << CODEWORD_ALL_ERASED) | (1 << CODEWORD_ERASED))
+#define NUM_ERRORS		0x1f
 
 #define MSM_NAND_CTRL(info)		    MSM_NAND_REG(info, 0x30F00)
 #define BAM_MODE_EN	0
+#define BAM_MODE_EN_MASK	0x1
+#define BOOST_MODE_EN	0xB
 #define MSM_NAND_VERSION(info)         MSM_NAND_REG(info, 0x34F08)
 #define MSM_NAND_READ_LOCATION_0(info)      MSM_NAND_REG(info, 0x30F20)
 #define MSM_NAND_READ_LOCATION_1(info)      MSM_NAND_REG(info, 0x30F24)
 #define MSM_NAND_READ_LOCATION_LAST_CW_0(info) MSM_NAND_REG(info, 0x30F40)
 #define MSM_NAND_READ_LOCATION_LAST_CW_1(info) MSM_NAND_REG(info, 0x30F44)
 #define MSM_NAND_AUTO_STATUS_EN(info)       MSM_NAND_REG(info, 0x3002c)
+#define MSM_NAND_MULTI_PAGE_CMD(info)       MSM_NAND_REG(info, 0x30F60)
 
 #define NAND_FLASH_STATUS_EN                     BIT(0)
 #define NANDC_BUFFER_STATUS_EN                   BIT(1)
@@ -197,6 +206,13 @@
 #define MSM_NAND_CMD_PAGE_READ_ECC_PS   0x800033
 #define MSM_NAND_CMD_PAGE_READ_ALL_PS   0x800034
 
+/* device read commands for multipage */
+
+#define MSM_NAND_CMD_PAGE_READ_ECC_MP   0x400033
+#define MSM_NAND_CMD_PAGE_READ_ALL_MP   0x400034
+
+#define MAX_MULTI_PAGE_READS   8
+
 /* Version Mask */
 #define MSM_NAND_VERSION_MAJOR_MASK	0xF0000000
 #define MSM_NAND_VERSION_MAJOR_SHIFT	28
@@ -217,7 +233,7 @@ struct msm_nand_sps_cmd {
 };
 
 struct msm_nand_cmd_setup_desc {
-	struct sps_command_element ce[13];
+	struct sps_command_element ce[14];
 	uint32_t flags;
 	uint32_t num_ce;
 };
@@ -274,8 +290,10 @@ struct msm_nand_chip {
 	uint32_t qpic_version; /* To store the qpic controller major version */
 	uint16_t qpic_min_version; /* To store the qpic controller minor version */
 	uint32_t caps; /* General host capabilities */
-#define MSM_NAND_CAP_PAGE_SCOPE_READ   BIT(0)
-#define MSM_NAND_CAP_MULTI_PAGE_READ   BIT(1)
+#define MSM_NAND_CAP_PAGE_SCOPE_READ	BIT(0)
+#define MSM_NAND_CAP_MULTI_PAGE_READ	BIT(1)
+#define MSM_NAND_CAP_BOOST_MODE		BIT(2)
+#define MSM_NAND_INTERRUPT_MODE_ENABLE  BIT(3) /* To enable nand in Interrupt mode */
 };
 
 /* Structure that defines an SPS end point for a NANDc BAM pipe. */
@@ -312,6 +330,7 @@ struct flash_identification {
 	uint32_t oobsize;
 	uint32_t ecc_correctability;
 	uint32_t ecc_capability; /* Set based on the ECC capability selected. */
+	uint16_t timing_mode_support; /* Timing mode */
 	/* Flag to distinguish b/w ONFI and NON-ONFI properties */
 	bool is_onfi_compliant;
 };
@@ -369,6 +388,8 @@ struct msm_nand_info {
 	struct flash_identification flash_dev;
 	struct msm_nand_clk_data clk_data;
 	u64 dma_mask;
+	u32 bam_irq_type; /*Edge trigger or Level trigger */
+	unsigned long panic_notifier_dump; /* set upon nand panic notifier call */
 };
 
 extern struct nand_flash_dev nand_flash_ids[];
@@ -424,7 +445,7 @@ struct onfi_param_page {
 #define FLASH_PTABLE_V3		3
 #define FLASH_PTABLE_V4		4
 #define FLASH_PTABLE_MAX_PARTS_V3 16
-#define FLASH_PTABLE_MAX_PARTS_V4 48
+#define FLASH_PTABLE_MAX_PARTS_V4 80
 #define FLASH_PTABLE_HDR_LEN (4*sizeof(uint32_t))
 #define FLASH_PTABLE_ENTRY_NAME_SIZE 16
 
@@ -451,4 +472,15 @@ static inline bool is_buffer_in_page(const void *buf, size_t len)
 {
 	return !(((unsigned long) buf & ~PAGE_MASK) + len > PAGE_SIZE);
 }
+
+static void msm_nand_bam_free(struct msm_nand_info *nand_info);
+static int msm_nand_bam_init(struct msm_nand_info *nand_info);
+static int msm_nand_enable_dma(struct msm_nand_info *info);
+static int msm_nand_init_status_pipe(struct msm_nand_info *info);
+static int msm_nand_get_device(struct device *dev);
+static int msm_nand_put_device(struct device *dev);
+static int msm_nand_flash_rd_rw_reg(struct msm_nand_info *info,
+		uint32_t addr, uint32_t *val, uint32_t command);
+static int msm_nand_boost_mode_enable(struct msm_nand_info *info);
+
 #endif /* __QPIC_NAND_H */

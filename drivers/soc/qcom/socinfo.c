@@ -1266,7 +1266,13 @@ static const struct soc_id soc_id[] = {
 	{ 536, "KALAMAP" },
 	{ 539, "CINDERRU"},
 	{ 545, "CINDERDU"},
+	{ 556, "SDXPINN"},
+	{ 560, "SA410M"},
+	{ 558, "SA525M"},
+	{ 559, "SA522M"},
+	{ 580, "SDXPINNM"},
 	{ 570, "SDXBAAGHA"},
+	{ 571, "SDXBAAGHA_HYBRID"},
 	{ 587, "CINDERDU_1010"},
 	{ 588, "CINDERRU_1032"},
 	{ 589, "CINDERRU_1052"},
@@ -1275,6 +1281,8 @@ static const struct soc_id soc_id[] = {
 	{ 599, "QRB3165N"},
 	{ 600, "SG_KALAMA"},
 	{ 601, "SG_KALAMAP"},
+	{ 609, "SDXPINNL"},
+	{ 610, "SDXPINNUL"},
 	{ 603, "QCS_KALAMAP"},
 	{ 604, "QCM_KALAMA"},
 	{ 605, "MONACOAU_ADAS"},
@@ -1287,6 +1295,9 @@ static const struct soc_id soc_id[] = {
 	{ 668, "QCS_KALAMAP_N"},
 	{ 687, "CROWP" },
 	{ 688, "QCM_KALAMA_N"},
+	{ 716, "QCMPINN"},
+	{ 717, "QCMKUNO"},
+	{ 738, "QCMKUNO_L"}
 };
 
 static struct qcom_socinfo *qsocinfo;

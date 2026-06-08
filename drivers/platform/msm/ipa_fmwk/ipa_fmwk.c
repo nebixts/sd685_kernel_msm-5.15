@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/ipa_fmwk.h>
@@ -499,8 +499,26 @@ struct ipa_fmwk_contex {
 
 	bool (*ipa_eth_client_exist)(
 		enum ipa_eth_client_type eth_client_type, int inst_id);
+
+	int (*ipa_eth_get_config_type)(enum ipa_eth_client_type client_type,
+		int inst_id, struct ipa_eth_config *eth_config);
+
+	int (*ipa_eth_client_enable_pipes)(struct ipa_eth_client *client);
+
+	int (*ipa_eth_client_disable_pipes)(struct ipa_eth_client *client);
+
 	int (*ipa_add_socksv5_conn)(struct ipa_socksv5_info *info);
 	int (*ipa_del_socksv5_conn)(uint32_t handle);
+
+	int (*ipa_eth_qos_get_num_pipes)(
+		u8 inst_id, u8 *num_pipes, enum ipa_eth_pipe_direction dir);
+	int (*ipa_eth_qos_get_qos_info)
+	(
+		u8 inst_id,
+		u8 idx,
+		struct ipa_eth_qos_info *info,
+		enum ipa_eth_pipe_direction dir
+	);
 };
 
 static struct ipa_fmwk_contex *ipa_fmwk_ctx;
@@ -2590,7 +2608,12 @@ int ipa_fmwk_register_ipa_eth(const struct ipa_eth_data *in)
 		|| ipa_fmwk_ctx->ipa_eth_client_unreg_intf
 		|| ipa_fmwk_ctx->ipa_eth_client_set_perf_profile
 		|| ipa_fmwk_ctx->ipa_eth_get_ipa_client_type_from_eth_type
-		|| ipa_fmwk_ctx->ipa_eth_client_exist) {
+		|| ipa_fmwk_ctx->ipa_eth_client_exist
+		|| ipa_fmwk_ctx->ipa_eth_get_config_type
+		|| ipa_fmwk_ctx->ipa_eth_qos_get_num_pipes
+		|| ipa_fmwk_ctx->ipa_eth_qos_get_qos_info
+		|| ipa_fmwk_ctx->ipa_eth_client_enable_pipes
+		|| ipa_fmwk_ctx->ipa_eth_client_disable_pipes) {
 		pr_err("ipa_eth APIs were already initialized\n");
 		return -EPERM;
 	}
@@ -2609,6 +2632,16 @@ int ipa_fmwk_register_ipa_eth(const struct ipa_eth_data *in)
 		in->ipa_eth_get_ipa_client_type_from_eth_type;
 	ipa_fmwk_ctx->ipa_eth_client_exist =
 		in->ipa_eth_client_exist;
+	ipa_fmwk_ctx->ipa_eth_get_config_type =
+		in->ipa_eth_get_config_type;
+	ipa_fmwk_ctx->ipa_eth_qos_get_num_pipes =
+		in->ipa_eth_qos_get_num_pipes;
+	ipa_fmwk_ctx->ipa_eth_qos_get_qos_info =
+		in->ipa_eth_qos_get_qos_info;
+	ipa_fmwk_ctx->ipa_eth_client_enable_pipes =
+		in->ipa_eth_client_enable_pipes;
+	ipa_fmwk_ctx->ipa_eth_client_disable_pipes =
+		in->ipa_eth_client_disable_pipes;
 
 	pr_info("ipa_eth registered successfully\n");
 
@@ -2743,6 +2776,67 @@ bool ipa_eth_client_exist(
 	return ret;
 }
 EXPORT_SYMBOL(ipa_eth_client_exist);
+
+int ipa_eth_get_config_type(
+	enum ipa_eth_client_type client_type, int inst_id, struct ipa_eth_config *eth_config)
+{
+	int ret;
+
+	IPA_FMWK_DISPATCH_RETURN_DP(ipa_eth_get_config_type,
+		client_type, inst_id, eth_config);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ipa_eth_get_config_type);
+
+int ipa_eth_qos_get_num_pipes(
+	u8 inst_id, u8 *num_pipes, enum ipa_eth_pipe_direction dir)
+{
+	int ret;
+
+	IPA_FMWK_DISPATCH_RETURN_DP(ipa_eth_qos_get_num_pipes,
+		inst_id, num_pipes, dir);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ipa_eth_qos_get_num_pipes);
+
+int ipa_eth_qos_get_qos_info(
+	u8 inst_id, u8 idx, struct ipa_eth_qos_info *info,
+	enum ipa_eth_pipe_direction dir)
+{
+	int ret;
+
+	IPA_FMWK_DISPATCH_RETURN_DP(ipa_eth_qos_get_qos_info,
+		inst_id, idx, info, dir);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ipa_eth_qos_get_qos_info);
+
+int ipa_eth_client_enable_pipes(
+	struct ipa_eth_client *client)
+{
+	int ret;
+
+	IPA_FMWK_DISPATCH_RETURN_DP(ipa_eth_client_enable_pipes,
+		client);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ipa_eth_client_enable_pipes);
+
+int ipa_eth_client_disable_pipes(
+	struct ipa_eth_client *client)
+{
+	int ret;
+
+	IPA_FMWK_DISPATCH_RETURN_DP(ipa_eth_client_disable_pipes,
+		client);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(ipa_eth_client_disable_pipes);
 
 /* module functions */
 static int __init ipa_fmwk_init(void)

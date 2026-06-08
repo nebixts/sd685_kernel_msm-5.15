@@ -10,6 +10,7 @@
 #include <linux/fs_parser.h>
 #include <linux/ipc_logging.h>
 #include <linux/usb/functionfs.h>
+#include <linux/uio.h>
 
 #include "u_fs.h"
 
@@ -32,6 +33,9 @@ struct ffs_io_data {
 	bool use_sg;
 
 	struct ffs_data *ffs;
+
+	int status;
+	struct completion done;
 };
 
 /* Copied from f_fs.c */
@@ -204,14 +208,23 @@ static void *get_ipc_context(struct ffs_data *ffs)
 	return NULL;
 }
 
+static unsigned long ffs_pt_reg(struct pt_regs *regs, int reg)
+{
+#ifdef CONFIG_ARM64
+	return regs->regs[reg];
+#elif CONFIG_ARM
+	return regs->uregs[reg];
+#endif
+}
+
+
 static int entry_ffs_user_copy_worker(struct kretprobe_instance *ri,
 				      struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct work_struct *work = (struct work_struct *)regs->regs[0];
+	struct work_struct *work = (struct work_struct *)ffs_pt_reg(regs, 0);
 	struct ffs_io_data *io_data = container_of(work, struct ffs_io_data, work);
-	int ret = io_data->req->status ? io_data->req->status :
-					 io_data->req->actual;
+	int ret = io_data->status;
 	struct ffs_data *ffs = io_data->ffs;
 	void *context = get_ipc_context(ffs);
 
@@ -224,8 +237,8 @@ static int entry_ffs_user_copy_worker(struct kretprobe_instance *ri,
 static int entry_ffs_epfile_io(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct file *file = (struct file *)regs->regs[0];
-	struct ffs_io_data *io_data = (struct ffs_io_data *)regs->regs[1];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 0);
+	struct ffs_io_data *io_data = (struct ffs_io_data *)ffs_pt_reg(regs, 1);
 	struct ffs_epfile *epfile = file->private_data;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -251,7 +264,7 @@ static int exit_ffs_epfile_io(struct kretprobe_instance *ri, struct pt_regs *reg
 static int entry_ffs_epfile_async_io_complete(struct kretprobe_instance *ri,
 					      struct pt_regs *regs)
 {
-	struct usb_request *req = (struct usb_request *)regs->regs[1];
+	struct usb_request *req = (struct usb_request *)ffs_pt_reg(regs, 1);
 	struct ffs_io_data *io_data = req->context;
 	void *context = get_ipc_context(io_data->ffs);
 
@@ -263,7 +276,7 @@ static int entry_ffs_epfile_write_iter(struct kretprobe_instance *ri,
 				       struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct kiocb *kiocb = (struct kiocb *)regs->regs[0];
+	struct kiocb *kiocb = (struct kiocb *)ffs_pt_reg(regs, 0);
 	struct ffs_epfile *epfile = kiocb->ki_filp->private_data;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -290,7 +303,7 @@ static int entry_ffs_epfile_read_iter(struct kretprobe_instance *ri,
 				      struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct kiocb *kiocb = (struct kiocb *)regs->regs[0];
+	struct kiocb *kiocb = (struct kiocb *)ffs_pt_reg(regs, 0);
 	struct ffs_epfile *epfile = kiocb->ki_filp->private_data;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -315,7 +328,7 @@ static int exit_ffs_epfile_read_iter(struct kretprobe_instance *ri,
 static int entry_ffs_data_put(struct kretprobe_instance *ri,
 				struct pt_regs *regs)
 {
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 	unsigned int refcount = refcount_read(&ffs->ref);
 
@@ -326,7 +339,7 @@ static int entry_ffs_data_put(struct kretprobe_instance *ri,
 
 static int entry_ffs_sb_fill(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
-	struct fs_context *fc = (struct fs_context *)regs->regs[1];
+	struct fs_context *fc = (struct fs_context *)ffs_pt_reg(regs, 1);
 	struct ffs_sb_fill_data *data = fc->fs_private;
 
 	create_ipc_context(fc->source, data->ffs_data);
@@ -338,7 +351,7 @@ static int entry___ffs_ep0_queue_wait(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 
 	data->x0 = ffs;
@@ -363,9 +376,9 @@ static int entry_ffs_ep0_write(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct file *file = (struct file *)regs->regs[0];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 0);
 	struct ffs_data *ffs = file->private_data;
-	unsigned int len = (unsigned int)regs->regs[2];
+	unsigned int len = (unsigned int)ffs_pt_reg(regs, 2);
 	void *context = get_ipc_context(ffs);
 
 	data->x0 = file;
@@ -396,8 +409,8 @@ static int entry_ffs_ep0_read(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct file *file = (struct file *)regs->regs[0];
-	size_t len = (size_t)regs->regs[2];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 0);
+	size_t len = (size_t)ffs_pt_reg(regs, 2);
 	struct ffs_data *ffs = file->private_data;
 	void *context = get_ipc_context(ffs);
 	size_t n;
@@ -426,7 +439,7 @@ static int exit_ffs_ep0_read(struct kretprobe_instance *ri,
 static int entry_ffs_ep0_open(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct inode *inode = (struct inode *)regs->regs[0];
+	struct inode *inode = (struct inode *)ffs_pt_reg(regs, 0);
 	struct ffs_data *ffs = inode->i_private;
 	void *context = get_ipc_context(ffs);
 
@@ -439,7 +452,7 @@ static int entry_ffs_ep0_open(struct kretprobe_instance *ri,
 static int entry_ffs_ep0_release(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct file *file = (struct file *)regs->regs[1];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 1);
 	struct ffs_data *ffs = file->private_data;
 	void *context = get_ipc_context(ffs);
 
@@ -452,7 +465,7 @@ static int entry_ffs_ep0_release(struct kretprobe_instance *ri,
 static int entry_ffs_ep0_ioctl(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct file *file = (struct file *)regs->regs[0];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 0);
 	struct ffs_data *ffs = file->private_data;
 	void *context = get_ipc_context(ffs);
 
@@ -466,7 +479,7 @@ static int entry_ffs_ep0_poll(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct file *file = (struct file *)regs->regs[0];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 0);
 	struct ffs_data *ffs = file->private_data;
 	void *context = get_ipc_context(ffs);
 
@@ -493,7 +506,7 @@ static int exit_ffs_ep0_poll(struct kretprobe_instance *ri,
 static int entry_ffs_epfile_open(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct inode *inode = (struct inode *)regs->regs[0];
+	struct inode *inode = (struct inode *)ffs_pt_reg(regs, 0);
 	struct ffs_epfile *epfile = inode->i_private;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -507,7 +520,7 @@ static int entry_ffs_aio_cancel(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct kiocb *kiocb = (struct kiocb *)regs->regs[0];
+	struct kiocb *kiocb = (struct kiocb *)ffs_pt_reg(regs, 0);
 	struct ffs_epfile *epfile = kiocb->ki_filp->private_data;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -534,7 +547,7 @@ static int exit_ffs_aio_cancel(struct kretprobe_instance *ri,
 static int entry_ffs_epfile_release(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct inode *inode = (struct inode *)regs->regs[0];
+	struct inode *inode = (struct inode *)ffs_pt_reg(regs, 0);
 	struct ffs_epfile *epfile = inode->i_private;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -548,9 +561,9 @@ static int entry_ffs_epfile_ioctl(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct file *file = (struct file *)regs->regs[0];
-	unsigned int code = (unsigned int)regs->regs[1];
-	unsigned long value = (unsigned long)regs->regs[2];
+	struct file *file = (struct file *)ffs_pt_reg(regs, 0);
+	unsigned int code = (unsigned int)ffs_pt_reg(regs, 1);
+	unsigned long value = (unsigned long)ffs_pt_reg(regs, 2);
 	struct ffs_epfile *epfile = file->private_data;
 	void *context = get_ipc_context(epfile->ffs);
 
@@ -578,7 +591,7 @@ static int exit_ffs_epfile_ioctl(struct kretprobe_instance *ri,
 static int entry_ffs_data_opened(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 
 	kprobe_log(context,
@@ -591,7 +604,7 @@ static int entry_ffs_data_opened(struct kretprobe_instance *ri,
 static int entry_ffs_data_closed(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 
 	kprobe_log(context, "state %d setup_state %d flag %lu opened %d",
@@ -603,7 +616,7 @@ static int entry_ffs_data_closed(struct kretprobe_instance *ri,
 static int entry_ffs_data_clear(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 
 	kprobe_log(context, "enter: state %d setup_state %d flag %lu",
@@ -615,7 +628,7 @@ static int entry_functionfs_bind(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 
 	data->x0 = ffs;
@@ -639,7 +652,7 @@ static int exit_functionfs_bind(struct kretprobe_instance *ri,
 static int entry_ffs_func_eps_disable(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct ffs_function *func = (struct ffs_function *)regs->regs[0];
+	struct ffs_function *func = (struct ffs_function *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(func->ffs);
 
 	kprobe_log(context, "enter: state %d setup_state %d flag %lu",
@@ -651,7 +664,7 @@ static int entry_ffs_func_bind(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct usb_function *f = (struct usb_function *)regs->regs[1];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 1);
 	struct f_fs_opts *ffs_opts =
 		container_of(f->fi, struct f_fs_opts, func_inst);
 	/* func->ffs not set yet; get ffs_data via ffs_opts instead */
@@ -690,7 +703,7 @@ static int exit_ffs_func_bind(struct kretprobe_instance *ri,
 static int entry_ffs_reset_work(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct work_struct *work = (struct work_struct *)regs->regs[0];
+	struct work_struct *work = (struct work_struct *)ffs_pt_reg(regs, 0);
 	struct ffs_data *ffs = container_of(work, struct ffs_data, reset_work);
 	void *context = get_ipc_context(ffs);
 
@@ -702,9 +715,9 @@ static int entry_ffs_func_set_alt(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct usb_function *f = (struct usb_function *)regs->regs[0];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 0);
 	struct ffs_function *func = container_of(f, struct ffs_function, function);
-	unsigned int alt = (unsigned int)regs->regs[2];
+	unsigned int alt = (unsigned int)ffs_pt_reg(regs, 2);
 	void *context = get_ipc_context(func->ffs);
 
 	data->x0 = func;
@@ -715,7 +728,7 @@ static int entry_ffs_func_set_alt(struct kretprobe_instance *ri,
 static int entry_ffs_func_disable(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct usb_function *f = (struct usb_function *)regs->regs[0];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 0);
 	struct ffs_function *func = container_of(f, struct ffs_function, function);
 	void *context = get_ipc_context(func->ffs);
 
@@ -726,9 +739,9 @@ static int entry_ffs_func_disable(struct kretprobe_instance *ri,
 static int entry_ffs_func_setup(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct usb_function *f = (struct usb_function *)regs->regs[0];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 0);
 	struct ffs_function *func = container_of(f, struct ffs_function, function);
-	struct usb_ctrlrequest *creq = (struct usb_ctrlrequest *)regs->regs[1];
+	struct usb_ctrlrequest *creq = (struct usb_ctrlrequest *)ffs_pt_reg(regs, 1);
 	struct ffs_data *ffs = func->ffs;
 	void *context = get_ipc_context(func->ffs);
 
@@ -743,7 +756,7 @@ static int entry_ffs_func_setup(struct kretprobe_instance *ri,
 static int entry_ffs_func_suspend(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct usb_function *f = (struct usb_function *)regs->regs[0];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 0);
 	struct ffs_function *func = container_of(f, struct ffs_function, function);
 	void *context = get_ipc_context(func->ffs);
 
@@ -754,7 +767,7 @@ static int entry_ffs_func_suspend(struct kretprobe_instance *ri,
 static int entry_ffs_func_resume(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
-	struct usb_function *f = (struct usb_function *)regs->regs[0];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 0);
 	struct ffs_function *func = container_of(f, struct ffs_function, function);
 	void *context = get_ipc_context(func->ffs);
 
@@ -766,7 +779,7 @@ static int entry_ffs_func_unbind(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct usb_function *f = (struct usb_function *)regs->regs[1];
+	struct usb_function *f = (struct usb_function *)ffs_pt_reg(regs, 1);
 	struct ffs_function *func = container_of(f, struct ffs_function, function);
 	struct ffs_data *ffs = func->ffs;
 	struct f_fs_opts *opts =
@@ -795,7 +808,7 @@ static int entry_ffs_closed(struct kretprobe_instance *ri,
 				    struct pt_regs *regs)
 {
 	struct kprobe_data *data = (struct kprobe_data *)ri->data;
-	struct ffs_data *ffs = (struct ffs_data *)regs->regs[0];
+	struct ffs_data *ffs = (struct ffs_data *)ffs_pt_reg(regs, 0);
 	void *context = get_ipc_context(ffs);
 
 	data->x0 = ffs;

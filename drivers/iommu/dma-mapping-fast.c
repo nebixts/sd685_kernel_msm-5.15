@@ -26,6 +26,8 @@
 #define FAST_PAGE_SIZE (1UL << FAST_PAGE_SHIFT)
 #define FAST_PAGE_MASK (~(PAGE_SIZE - 1))
 
+#define MAX_ADDRESS	((~0ULL << CONFIG_IOMMU_IO_PGTABLE_FAST_MAXSZ) - 1)
+
 static struct rb_root mappings;
 static DEFINE_RWLOCK(mappings_lock);
 
@@ -1051,8 +1053,7 @@ int fast_smmu_init_mapping(struct device *dev, struct iommu_domain *domain,
 		return -EINVAL;
 
 	dma_base = max_t(u64, domain->geometry.aperture_start, 0);
-	dma_end = min_t(u64, domain->geometry.aperture_end,
-			(SZ_1G * 4ULL - 1));
+	dma_end = min_t(u64, domain->geometry.aperture_end, MAX_ADDRESS);
 	size = dma_end - dma_base + 1;
 	if (dma_base >= dma_end) {
 		dev_err(dev, "Invalid domain geometry\n");
@@ -1111,9 +1112,16 @@ void fast_smmu_setup_dma_ops(struct device *dev, u64 dma_base, u64 dma_limit)
 }
 EXPORT_SYMBOL(fast_smmu_setup_dma_ops);
 
+#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
 int __init dma_mapping_fast_init(void)
 {
 	return register_trace_android_rvh_iommu_setup_dma_ops(
 			__fast_smmu_setup_dma_ops, NULL);
 }
+#else
+int __init dma_mapping_fast_init(void)
+{
+	return 0;
+}
+#endif
 

@@ -318,13 +318,21 @@ inline int dwc3_core_stop_hw_active_transfers(struct dwc3 *dwc)
 { return 0; }
 #endif
 
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_ARM)
 int dwc3_msm_kretprobe_init(void);
 void dwc3_msm_kretprobe_exit(void);
 #else
-int dwc3_msm_kretprobe_init(void)
+static inline int dwc3_msm_kretprobe_init(void)
 { return 0; }
-void dwc3_msm_kretprobe_exit(void)
+static inline void dwc3_msm_kretprobe_exit(void)
+{ }
+#endif
+
+#if IS_ENABLED(CONFIG_USB_F_GSI)
+void rmnet_gsi_update_in_buffer_mem_type(struct usb_function *f, bool use_tcm);
+#else
+static inline __maybe_unused void rmnet_gsi_update_in_buffer_mem_type(
+				struct usb_function *f, bool use_tcm)
 { }
 #endif
 

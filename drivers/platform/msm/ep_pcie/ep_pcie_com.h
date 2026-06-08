@@ -18,6 +18,9 @@
 #include <linux/delay.h>
 #include <linux/msm_ep_pcie.h>
 #include <linux/iommu.h>
+#if IS_ENABLED(CONFIG_QCOM_SCM)
+#include <linux/qcom_scm.h>
+#endif
 
 #define PCIE20_PARF_SYS_CTRL           0x00
 #define PCIE20_PARF_DB_CTRL            0x10
@@ -49,6 +52,11 @@
 #define PCIE20_PARF_INT_ALL_3_STATUS   0x2D88
 #define PCIE20_PARF_INT_ALL_3_MASK     0x2D8C
 #define PCIE20_PARF_INT_ALL_3_CLEAR    0x2D90
+#define PCIE20_PARF_LTSSM_STATE_MASK   0x003f
+#define PCIE20_PARF_PM_STTS_PM_LINKST_IN_L1SUB_MASK       BIT(8)
+#define PCIE20_PARF_PM_STTS_PM_LINKST_IN_L1SUB_SHIFT      8
+#define PCIE20_PARF_PM_STTS_PM_DSTATE_0_MASK              BIT(29)
+#define PCIE20_PARF_PM_STTS_PM_DSTATE_0_SHIFT             29
 #define PCIE20_PARF_MHI_BASE_ADDR_V1_VFn_LOWER(n)       (((n) * 0x8) + 0x3088)
 #define PCIE20_PARF_MHI_BASE_ADDR_V1_VFn_UPPER(n)       (((n) * 0x8)  + 0x308C)
 #define PCIE20_PARF_MHI_BASE_ADDR_VFn_LOWER(n)       (((n) * 0x28) + 0x3100)
@@ -199,6 +207,13 @@
 #define PCIE20_BHI_VERSION_UPPER	0x204
 #define PCIE20_BHI_INTVEC		0x220
 
+#define PCIE20_MMIO_CTRL_INT_MASK_A7    0x94
+#define PCIE20_ERDB_INT_MASK_A7_n(n)    (0x00c8 + 0x4 * (n))
+#define PCIE20_CHDB_INT_CLEAR_A7_n(n)   (0x0070 + 0x4 * (n))
+#define PCIE20_ERDB_INT_CLEAR_A7_n(n)   (0x0080 + 0x4 * (n))
+#define PCIE20_MMIO_CTRL_INT_CLEAR_A7   0x4c
+
+
 #define PCIE20_AUX_CLK_FREQ_REG        0xB40
 #define PCIE20_GEN3_RELATED_OFF		0x890
 
@@ -221,6 +236,7 @@
 #define MSI_EXIT_L1SS_WAIT	              10
 #define MSI_EXIT_L1SS_WAIT_MAX_COUNT          100
 #define XMLH_LINK_UP                          0x400
+#define PARF_PM_LINKST_IN_L2                  0x00000020
 #define PARF_XMLH_LINK_UP                     0x40000000
 
 #define MAX_PROP_SIZE 32
@@ -232,7 +248,7 @@
 
 #define EP_PCIE_LOG_PAGES 50
 #define EP_PCIE_MAX_VREG 4
-#define EP_PCIE_MAX_CLK 22
+#define EP_PCIE_MAX_CLK 23
 #define EP_PCIE_MAX_PIPE_CLK 1
 #define EP_PCIE_MAX_RESET 2
 
@@ -278,7 +294,7 @@
 	} while (0)
 
 #define EP_PCIE_EOM(lane, dev, fmt, arg...) do {			\
-	ipc_log_string((dev)->ipc_log_eom, \
+	ipc_log_string((dev)->ipc_log_eom[lane], \
 		"" fmt, arg); \
 	if (ep_pcie_get_debug_mask())   \
 		pr_alert("%s: " fmt, __func__, arg); \
@@ -333,6 +349,94 @@ enum ep_pcie_gpio {
 	EP_PCIE_GPIO_CLKREQ,
 	EP_PCIE_GPIO_MDM2AP,
 	EP_PCIE_MAX_GPIO,
+};
+
+enum ep_pcie_ltssm {
+	LTSSM_DETECT_QUIET = 0x00,
+	LTSSM_DETECT_ACT = 0x01,
+	LTSSM_POLL_ACTIVE = 0x02,
+	LTSSM_POLL_COMPLIANCE = 0x03,
+	LTSSM_POLL_CONFIG = 0x04,
+	LTSSM_PRE_DETECT_QUIET = 0x05,
+	LTSSM_DETECT_WAIT = 0x06,
+	LTSSM_CFG_LINKWD_START = 0x07,
+	LTSSM_CFG_LINKWD_ACEPT = 0x08,
+	LTSSM_CFG_LANENUM_WAIT = 0x09,
+	LTSSM_CFG_LANENUM_ACEPT = 0x0a,
+	LTSSM_CFG_COMPLETE = 0x0b,
+	LTSSM_CFG_IDLE = 0x0c,
+	LTSSM_RCVRY_LOCK = 0x0d,
+	LTSSM_RCVRY_SPEED = 0x0e,
+	LTSSM_RCVRY_RCVRCFG = 0x0f,
+	LTSSM_RCVRY_IDLE = 0x10,
+	LTSSM_RCVRY_EQ0 = 0x20,
+	LTSSM_RCVRY_EQ1 = 0x21,
+	LTSSM_RCVRY_EQ2 = 0x22,
+	LTSSM_RCVRY_EQ3 = 0x23,
+	LTSSM_L0 = 0x11,
+	LTSSM_L0S = 0x12,
+	LTSSM_L123_SEND_EIDLE = 0x13,
+	LTSSM_L1_IDLE = 0x14,
+	LTSSM_L2_IDLE = 0x15,
+	LTSSM_L2_WAKE = 0x16,
+	LTSSM_DISABLED_ENTRY = 0x17,
+	LTSSM_DISABLED_IDLE = 0x18,
+	LTSSM_DISABLED = 0x19,
+	LTSSM_LPBK_ENTRY = 0x1a,
+	LTSSM_LPBK_ACTIVE = 0x1b,
+	LTSSM_LPBK_EXIT = 0x1c,
+	LTSSM_LPBK_EXIT_TIMEOUT = 0x1d,
+	LTSSM_HOT_RESET_ENTRY = 0x1e,
+	LTSSM_HOT_RESET = 0x1f,
+};
+
+static const char * const ep_pcie_ltssm_str[] = {
+	[LTSSM_DETECT_QUIET] = "LTSSM_DETECT_QUIET",
+	[LTSSM_DETECT_ACT] = "LTSSM_DETECT_ACT",
+	[LTSSM_POLL_ACTIVE] = "LTSSM_POLL_ACTIVE",
+	[LTSSM_POLL_COMPLIANCE] = "LTSSM_POLL_COMPLIANCE",
+	[LTSSM_POLL_CONFIG] = "LTSSM_POLL_CONFIG",
+	[LTSSM_PRE_DETECT_QUIET] = "LTSSM_PRE_DETECT_QUIET",
+	[LTSSM_DETECT_WAIT] = "LTSSM_DETECT_WAIT",
+	[LTSSM_CFG_LINKWD_START] = "LTSSM_CFG_LINKWD_START",
+	[LTSSM_CFG_LINKWD_ACEPT] = "LTSSM_CFG_LINKWD_ACEPT",
+	[LTSSM_CFG_LANENUM_WAIT] = "LTSSM_CFG_LANENUM_WAIT",
+	[LTSSM_CFG_LANENUM_ACEPT] = "LTSSM_CFG_LANENUM_ACEPT",
+	[LTSSM_CFG_COMPLETE] = "LTSSM_CFG_COMPLETE",
+	[LTSSM_CFG_IDLE] = "LTSSM_CFG_IDLE",
+	[LTSSM_RCVRY_LOCK] = "LTSSM_RCVRY_LOCK",
+	[LTSSM_RCVRY_SPEED] = "LTSSM_RCVRY_SPEED",
+	[LTSSM_RCVRY_RCVRCFG] = "LTSSM_RCVRY_RCVRCFG",
+	[LTSSM_RCVRY_IDLE] = "LTSSM_RCVRY_IDLE",
+	[LTSSM_RCVRY_EQ0] = "LTSSM_RCVRY_EQ0",
+	[LTSSM_RCVRY_EQ1] = "LTSSM_RCVRY_EQ1",
+	[LTSSM_RCVRY_EQ2] = "LTSSM_RCVRY_EQ2",
+	[LTSSM_RCVRY_EQ3] = "LTSSM_RCVRY_EQ3",
+	[LTSSM_L0] = "LTSSM_L0",
+	[LTSSM_L0S] = "LTSSM_L0S",
+	[LTSSM_L123_SEND_EIDLE] = "LTSSM_L123_SEND_EIDLE",
+	[LTSSM_L1_IDLE] = "LTSSM_L1_IDLE",
+	[LTSSM_L2_IDLE] = "LTSSM_L2_IDLE",
+	[LTSSM_L2_WAKE] = "LTSSM_L2_WAKE",
+	[LTSSM_DISABLED_ENTRY] = "LTSSM_DISABLED_ENTRY",
+	[LTSSM_DISABLED_IDLE] = "LTSSM_DISABLED_IDLE",
+	[LTSSM_DISABLED] = "LTSSM_DISABLED",
+	[LTSSM_LPBK_ENTRY] = "LTSSM_LPBK_ENTRY",
+	[LTSSM_LPBK_ACTIVE] = "LTSSM_LPBK_ACTIVE",
+	[LTSSM_LPBK_EXIT] = "LTSSM_LPBK_EXIT",
+	[LTSSM_LPBK_EXIT_TIMEOUT] = "LTSSM_LPBK_EXIT_TIMEOUT",
+	[LTSSM_HOT_RESET_ENTRY] = "LTSSM_HOT_RESET_ENTRY",
+	[LTSSM_HOT_RESET] = "LTSSM_HOT_RESET",
+};
+
+static const char * const ep_pcie_l1ss_str[] = {
+	"LINK_IS_NOT_IN_L1SS",
+	"LINK_IS_IN_L1SS",
+};
+
+static const char * const ep_pcie_dsate_str[] = {
+	"D0_STATE",
+	"D3_HOT_STATE",
 };
 
 struct ep_pcie_gpio_info_t {
@@ -447,15 +551,18 @@ struct ep_pcie_dev_t {
 	u32			     msix_cap;
 	u32			     sriov_cap;
 	u32			     num_vfs;
+	u32			     *mmio_backup;
 	/* sriov_mask signifies the BME bit positions in PARF_INT_ALL_3_STATUS register */
 	ulong                        sriov_mask;
 	ulong                        sriov_enumerated;
 	void                         *ipc_log_sel;
 	void                         *ipc_log_ful;
 	void                         *ipc_log_dump;
-	void                         *ipc_log_eom;
+	void                         *ipc_log_eom[16];
+	void                         *ipc_log_eom_delay;
 	struct mutex                 setup_mtx;
 	struct mutex                 ext_mtx;
+	struct mutex                 clk_mtx;
 	spinlock_t                   ext_lock;
 	unsigned long                ext_save_flags;
 
@@ -494,6 +601,7 @@ struct ep_pcie_dev_t {
 	struct ep_pcie_msi_config    msi_cfg[MAX_PCIE_INSTANCES];
 	bool                         conf_ipa_msi_iatu[MAX_PCIE_INSTANCES];
 	bool                         use_iatu_msi;
+	bool			     mmio_backed;
 
 	struct ep_pcie_register_event *event_reg;
 	struct work_struct           handle_bme_work;
@@ -506,6 +614,10 @@ struct ep_pcie_dev_t {
 
 	bool				override_disable_sriov;
 	bool				no_path_from_ipa_to_pcie;
+	bool				configure_hard_reset;
+	bool				l1_disable;
+	bool				perst_sep_en;
+	bool				hot_rst_disable;
 	u32				tcsr_perst_separation_en_offset;
 	u32				tcsr_reset_separation_offset;
 	u32				tcsr_perst_enable_offset;
@@ -556,5 +668,20 @@ extern void ep_pcie_reg_dump(struct ep_pcie_dev_t *dev, u32 sel, bool linkdown);
 extern void ep_pcie_clk_dump(struct ep_pcie_dev_t *dev);
 extern void ep_pcie_debugfs_init(struct ep_pcie_dev_t *ep_dev);
 extern void ep_pcie_debugfs_exit(void);
+
+#if IS_ENABLED(CONFIG_L1SS_RESOURCES_HANDLING)
+int ep_pcie_l1ss_resources_init(struct ep_pcie_dev_t *dev);
+int ep_pcie_l1ss_resources_deinit(struct ep_pcie_dev_t *dev);
+#else
+static inline int ep_pcie_l1ss_resources_init(struct ep_pcie_dev_t *dev)
+{
+	return 0;
+}
+
+static inline int ep_pcie_l1ss_resources_deinit(struct ep_pcie_dev_t *dev)
+{
+	return 0;
+}
+#endif /* CONFIG_L1SS_RESOURCES_HANDLING */
 
 #endif

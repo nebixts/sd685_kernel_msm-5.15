@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPA_H_
@@ -19,7 +19,7 @@
 #define IPA_APPS_MAX_BW_IN_MBPS 700
 #define IPA_BW_THRESHOLD_MAX 3
 
-#define IPA_MAX_CH_STATS_SUPPORTED 5
+#define IPA_MAX_CH_STATS_SUPPORTED 6
 #define IPA_EP_ARR_SIZE 2
 #define IPA_EP_PER_REG 32
 
@@ -141,6 +141,43 @@ enum ipa_dp_evt_type {
 enum hdr_total_len_or_pad_type {
 	IPA_HDR_PAD = 0,
 	IPA_HDR_TOTAL_LEN = 1,
+};
+
+/**
+ * enum ipa_rmnet_tx_queue: RMNET TX queue numbers
+ * (regular traffic is unmapped: skb->queue_mapping = 0)
+ * IPA_RMNET_TX_QUEUE_DEFAULT: regular traffic
+ * IPA_RMNET_TX_QUEUE_V2X: V2X traffic
+ * IPA_RMNET_TX_QUEUE_ETH_PDU: Eth PDU traffic
+ * IPA_RMNET_TX_QUEUE_IPSEC_ENCAP: traffic for HW offloaded IPsec encapsulation
+ * IPA_RMNET_TX_QUEUE_IPSEC_DECAP: traffic for HW offloaded IPsec decapsulation
+ * IPA_RMNET_TX_QUEUE_MAX: enum size, for error reporting and boundaries
+ */
+enum ipa_rmnet_tx_queue {
+	IPA_RMNET_TX_QUEUE_DEFAULT = 0,
+	IPA_RMNET_TX_QUEUE_V2X,
+	IPA_RMNET_TX_QUEUE_ETH_PDU = IPA_RMNET_TX_QUEUE_V2X,
+	IPA_RMNET_TX_QUEUE_IPSEC_ENCAP,
+	IPA_RMNET_TX_QUEUE_IPSEC_DECAP,
+	IPA_RMNET_TX_QUEUE_MAX = U16_MAX - 1,
+};
+
+/**
+ * enum ipa_rmnet_rx_queue - RMNET RX queue numbers
+ * IPA_RMNET_RX_QUEUE_DEFAULT: regular traffic
+ * IPA_RMNET_RX_QUEUE_V2X: V2X traffic
+ * IPA_RMNET_RX_QUEUE_ETH_PDU: Eth PDU traffic
+ * IPA_RMNET_RX_QUEUE_IPSEC: traffic after HW offloaded IPsec decapsulation
+ * IPA_RMNET_RX_QUEUE_IPSEC_DECAP: exception after/during HW offloaded IPsec decapsulation
+ * IPA_RMNET_RX_QUEUE_MAX: enum size, for error reporting and boundaries
+ */
+enum ipa_rmnet_rx_queue {
+	IPA_RMNET_RX_QUEUE_DEFAULT = 0,
+	IPA_RMNET_RX_QUEUE_V2X,
+	IPA_RMNET_RX_QUEUE_ETH_PDU = IPA_RMNET_RX_QUEUE_V2X,
+	IPA_RMNET_RX_QUEUE_IPSEC,
+	IPA_RMNET_RX_QUEUE_IPSEC_ERROR,
+	IPA_RMNET_RX_QUEUE_MAX = U16_MAX - 1,
 };
 
 /**
@@ -285,10 +322,19 @@ struct ipa_ep_cfg_hdr_ext {
  *		This parameter is valid for Mode=DMA and not valid for
  *		Mode=Basic
  *		Valid for Input Pipes only (IPA Consumer)
+ * @drbip_en:	Set bit to indicate HPS-sequence configured on this pipe passes
+ *		through DRBIP-accelerator. can only be set if BEARER_CNTX_ENABLE field
+ *		for same consumer is set as well. Valid for consumer pipes only.
+ * @bearer_ctx_en: Set bit to allow support for deciphering (or ciphering)
+ *		and/or integrity-protection (DRBIP) for packets on this consumer pipe.
+ *		Deciphering/ciphering/IP-check will never be executed on pipes
+ *		with this bit off. Valid for consumer pipes only.
  */
 struct ipa_ep_cfg_mode {
 	enum ipa_mode_type mode;
 	enum ipa_client_type dst;
+	bool drbip_en;
+	bool bearer_ctx_en;
 };
 
 /**
@@ -496,6 +542,7 @@ struct ipa_ep_cfg_cfg {
  * producer.
  * @egress_tc_highest: Highest egress traffic-class index assignes to this
  * producer.
+ * @error_qmap_en: Enable IPsec error QMAP header insertion.
  */
 struct ipa_ep_cfg_prod_cfg {
 	u8 tx_instance;
@@ -505,6 +552,7 @@ struct ipa_ep_cfg_prod_cfg {
 	u8 max_output_size;
 	u8 egress_tc_lowest;
 	u8 egress_tc_highest;
+	bool error_qmap_en;
 };
 
 /**
@@ -536,6 +584,18 @@ struct ipa_ep_cfg_metadata {
 struct ipa_ep_cfg_seq {
 	bool set_dynamic;
 	int seq_type;
+};
+
+/**
+ * struct ipa_ep_cfg_ucp - uCP config register
+ * @command: Command ID at uCP, that the packets should hit
+ *
+ * @enable: 0 - Disabled
+ *		1- Enabled
+ */
+struct ipa_ep_cfg_ucp {
+	u16 command;
+	u32 enable;
 };
 
 /**
@@ -1234,12 +1294,14 @@ struct ipa_wdi_db_params {
  * @is_uC_ready: uC loaded or not
  * @priv : callback cookie
  * @notify:	callback
+ * @inst_id: instance id of wifi instance
  */
 typedef void (*ipa_uc_ready_cb)(void *priv);
 struct ipa_wdi_uc_ready_params {
 	bool is_uC_ready;
 	void *priv;
 	ipa_uc_ready_cb notify;
+	uint8_t inst_id;
 };
 
 /**
@@ -1316,6 +1378,7 @@ enum ipa_smmu_client_type {
 	IPA_SMMU_AP_CLIENT,
 	IPA_SMMU_WIGIG_CLIENT,
 	IPA_SMMU_WLAN1_CLIENT,
+	IPA_SMMU_WLAN2_CLIENT,
 	IPA_SMMU_ETH_CLIENT,
 	IPA_SMMU_ETH1_CLIENT,
 	IPA_SMMU_CLIENT_MAX
@@ -1430,6 +1493,14 @@ struct ipa_ipv6_nat_uc_tmpl {
 	uint64_t rsv11;
 	uint64_t rsv12;
 } __packed;
+
+struct ipa_ipsec_skb_cb {
+	u32 magic	:24;
+	u32 sa_dir      :2;
+	u32 sa_idx	:6;
+};
+#define IPA_IPSEC_SKB_MAGIC 0xFF10AD
+#define IPA_IPSEC_SKB_CB(__skb) ((struct ipa_ipsec_skb_cb *)&((__skb)->cb[44]))
 
 #if IS_ENABLED(CONFIG_IPA3)
 /*

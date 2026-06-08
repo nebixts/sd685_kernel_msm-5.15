@@ -17,6 +17,7 @@
 #include "stmmac_ptp.h"
 #include "dwmac4.h"
 #include "stmmac.h"
+#include "dwxgmac2.h"
 
 #define PTP_LIMIT 100000
 
@@ -213,12 +214,10 @@ static void timestamp_interrupt(struct stmmac_priv *priv)
 	u64 ptp_time;
 	int i;
 
-	if (priv->plat->int_snapshot_en) {
-		wake_up(&priv->tstamp_busy_wait);
-		return;
-	}
-
-	tsync_int = readl(priv->ioaddr + GMAC_INT_STATUS) & GMAC_INT_TSIE;
+	if (priv->plat->has_xgmac)
+		tsync_int = readl(priv->ioaddr + XGMAC_INT_STATUS) & XGMAC_TSIE;
+	else
+		tsync_int = readl(priv->ioaddr + GMAC_INT_STATUS) & GMAC_INT_TSIE;
 
 	if (!tsync_int)
 		return;
@@ -226,13 +225,20 @@ static void timestamp_interrupt(struct stmmac_priv *priv)
 	/* Read timestamp status to clear interrupt from either external
 	 * timestamp or start/end of PPS.
 	 */
-	ts_status = readl(priv->ioaddr + GMAC_TIMESTAMP_STATUS);
+	if (priv->plat->has_xgmac)
+		ts_status = readl(priv->ioaddr + XGMAC_TIMESTAMP_STATUS);
+	else
+		ts_status = readl(priv->ioaddr + GMAC_TIMESTAMP_STATUS);
 
 	if (!priv->plat->ext_snapshot_en)
 		return;
 
-	num_snapshot = (ts_status & GMAC_TIMESTAMP_ATSNS_MASK) >>
-		       GMAC_TIMESTAMP_ATSNS_SHIFT;
+	if (priv->plat->has_xgmac)
+		num_snapshot = (ts_status & XGMAC_TIMESTAMP_ATSNS_MASK) >>
+				XGMAC_TIMESTAMP_ATSNS_SHIFT;
+	else
+		num_snapshot = (ts_status & GMAC_TIMESTAMP_ATSNS_MASK) >>
+				GMAC_TIMESTAMP_ATSNS_SHIFT;
 
 	acr_value = readl(priv->ptpaddr + PTP_ACR);
 	channel = ilog2(FIELD_GET(PTP_ACR_MASK, acr_value));

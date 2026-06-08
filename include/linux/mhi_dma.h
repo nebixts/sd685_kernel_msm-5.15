@@ -16,6 +16,7 @@
 
 #include <linux/types.h>
 #include <linux/dma-mapping.h>
+#include <linux/if_ether.h>
 
 /* Defines & Enums */
 
@@ -103,6 +104,9 @@ struct mhi_dma_msi_info {
  * @notify: client callback
  * @priv: client private data to be provided in client callback
  * @test_mode: flag to indicate if DMA MHI is in unit test mode
+ * @disable_msi: flag to indicate if MSI is disabled.
+ * @host_ethaddr: host Ethernet address in network order
+ * @device_ethaddr: device Ethernet address in network order
  */
 struct mhi_dma_init_params {
 	struct mhi_dma_msi_info msi;
@@ -113,6 +117,9 @@ struct mhi_dma_init_params {
 	mhi_dma_cb notify;
 	void *priv;
 	bool test_mode;
+	bool disable_msi;
+	u8 host_ethaddr[ETH_ALEN];
+	u8 device_ethaddr[ETH_ALEN];
 };
 
 /*

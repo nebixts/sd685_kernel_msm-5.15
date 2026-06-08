@@ -403,6 +403,10 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 		val |= config->vco_val;
 		val |= config->alpha_en_mask;
 		val |= config->alpha_mode_mask;
+<<<<<<< HEAD
+=======
+
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 		mask = config->main_output_mask;
 		mask |= config->aux_output_mask;
 		mask |= config->aux2_output_mask;

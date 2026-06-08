@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __MHI_H
@@ -60,6 +60,7 @@ enum mhi_dev_ring_element_type_id {
 	MHI_DEV_RING_EL_CMD_COMPLETION_EVT = 33,
 	MHI_DEV_RING_EL_TRANSFER_COMPLETION_EVENT = 34,
 	MHI_DEV_RING_EL_EE_STATE_CHANGE_NOTIFY = 64,
+	MHI_DEV_RING_EL_CH_STATE_CHANGE_NOTIFY = 65,
 	MHI_DEV_RING_EL_UNDEF
 };
 
@@ -267,8 +268,8 @@ struct mhi_config {
 
 #define NUM_CHANNELS			128
 #define HW_CHANNEL_BASE			100
-#define NUM_HW_CHANNELS			15
-#define HW_CHANNEL_END			110
+#define NUM_HW_CHANNELS			28
+#define HW_CHANNEL_END			127
 #define MHI_ENV_VALUE			2
 #define MHI_MASK_ROWS_CH_EV_DB		4
 #define TRB_MAX_DATA_SIZE		8192
@@ -276,6 +277,8 @@ struct mhi_config {
 #define MHI_CTRL_STATE			100
 #define MHI_MAX_NUM_INSTANCES		17 /* 1PF and 16 VFs */
 #define MHI_DEFAULT_ERROR_LOG_ID	255
+#define MHI_DEV_WAKE_DB_CHAN		127
+#define PCIE_EP_TIMER_US		10000000
 
 /* maximum transfer completion events buffer */
 #define NUM_TR_EVENTS_DEFAULT			128
@@ -432,7 +435,6 @@ static inline void mhi_dev_ring_inc_index(struct mhi_dev_ring *ring,
 #define MHI_DEV_DATA_MAX			512
 
 #define MHI_DEV_MMIO_RANGE			0xb80
-#define MHI_DEV_MMIO_OFFSET			0x100
 
 struct ring_cache_req {
 	struct completion	*done;
@@ -449,16 +451,11 @@ struct event_req {
 	u32			num_events;
 	dma_addr_t		dma;
 	u32			dma_len;
-	dma_addr_t		event_rd_dma;
 	void			*context;
 	enum mhi_dev_tr_compl_evt_type event_type;
-	u32			event_ring;
-	void			(*client_cb)(void *req);
-	void			(*rd_offset_cb)(void *req);
-	void			(*msi_cb)(void *req);
 	struct list_head	list;
 	u32			flush_num;
-	u32			snd_cmpl;
+	bool			snd_cmpl;
 	bool		is_cmd_cpl;
 	bool		is_stale;
 };
@@ -535,7 +532,6 @@ struct mhi_dev {
 	phys_addr_t			mhi_dma_uc_mbox_crdb;
 	phys_addr_t			mhi_dma_uc_mbox_erdb;
 
-	uint32_t			*mmio_backup;
 	struct mhi_config		cfg;
 	u32				msi_data;
 	u32				msi_lower;
@@ -556,9 +552,9 @@ struct mhi_dev {
 	struct mhi_addr			cmd_ctx_shadow;
 	struct mhi_dev_ch_ctx		*cmd_ctx_cache;
 	dma_addr_t			cmd_ctx_cache_dma_handle;
-	struct mhi_dev_ring		*ring;
+	struct mhi_dev_ring		**ring;
 	int				mhi_irq;
-	struct mhi_dev_channel		*ch;
+	struct mhi_dev_channel		**ch;
 	struct mhi_cmd_cmpl_ctx			*cmd_ctx;
 
 	int				ctrl_int;
@@ -600,11 +596,7 @@ struct mhi_dev {
 	u32				mhi_version;
 	u32				mhi_chan_hw_base;
 	u32				mhi_num_ipc_pages_dev_fac;
-	void				*dma_cache;
-	void				*read_handle;
-	void				*write_handle;
 	/* Physical scratch buffer for writing control data to the host */
-	dma_addr_t			cache_dma_handle;
 	bool				mhi_dma_ready;
 
 	/* Use  PCI eDMA for data transfer */
@@ -636,10 +628,14 @@ struct mhi_dev {
 	/* Enable M2 autonomous mode from MHI */
 	bool				enable_m2;
 
+	/* Status of device wake doorbell */
+	bool				wake_db_status;
+
 	/* Dont timeout waiting for M0 */
 	bool				no_m0_timeout;
 
 	bool				stop_polling_m0;
+	bool				msi_disable;
 
 	/* Registered client callback list */
 	struct list_head		client_cb_list;
@@ -677,18 +673,8 @@ struct mhi_dev_ctx {
 	struct ep_pcie_register_event	event_reg;
 	u32				ifc_id;
 	struct ep_pcie_hw		*phandle;
-	struct mhi_dev			*mhi_dev[MHI_MAX_NUM_INSTANCES];
 
-	/*
-	 * Physical scratch buffer address used when picking host data
-	 * from the host used in mhi_read()
-	 */
-	dma_addr_t			read_dma_handle;
-	/*
-	 * Physical scratch buffer address used when writing to the host
-	 * region from device used in mhi_write()
-	 */
-	dma_addr_t			write_dma_handle;
+	struct mhi_dev			*mhi_dev[MHI_MAX_NUM_INSTANCES];
 
 	/* Tx, Rx DMA channels */
 	struct dma_chan			*tx_dma_chan;
@@ -707,11 +693,12 @@ enum mhi_id {
 
 enum mhi_msg_level {
 	MHI_MSG_VERBOSE = 0x0,
-	MHI_MSG_INFO = 0x1,
-	MHI_MSG_DBG = 0x2,
-	MHI_MSG_WARNING = 0x3,
-	MHI_MSG_ERROR = 0x4,
-	MHI_MSG_CRITICAL = 0x5,
+	MHI_MSG_DBG = 0x1,
+	MHI_MSG_INFO = 0x2,
+	MHI_MSG_NOTICE = 0x3,
+	MHI_MSG_WARNING = 0x4,
+	MHI_MSG_ERROR = 0x5,
+	MHI_MSG_CRITICAL = 0x6,
 	MHI_MSG_reserved = 0x80000000
 };
 
@@ -742,7 +729,7 @@ extern void *mhi_ipc_default_err_log;
 
 #define mhi_log(vf_id, _msg_lvl, _msg, ...) do { \
 	if (_msg_lvl >= mhi_msg_lvl) { \
-		pr_err("[0x%x %s] "_msg, bhi_imgtxdb, \
+		pr_err_ratelimited("[0x%x %s] "_msg, bhi_imgtxdb, \
 				__func__, ##__VA_ARGS__); \
 	} \
 	if (vf_id < MHI_MAX_NUM_INSTANCES && mhi_ipc_vf_log[vf_id] &&    \
@@ -1184,6 +1171,13 @@ int mhi_dev_syserr(struct mhi_dev *mhi);
 int mhi_dev_suspend(struct mhi_dev *mhi);
 
 /**
+ * mhi_channel_error_notif() - Send state change event to the host for channel e
+				error notification
+ * @dev:	MHI device structure.
+ */
+int mhi_channel_error_notif(struct mhi_dev *mhi);
+
+/**
  * mhi_dev_resume() - MHI device resume to update the channel state to running.
  * @dev:	MHI device structure.
  */
@@ -1225,6 +1219,13 @@ void mhi_uci_chan_state_notify_all(struct mhi_dev *mhi,
  */
 void mhi_uci_chan_state_notify(struct mhi_dev *mhi,
 		enum mhi_client_channel ch_id, enum mhi_ctrl_info ch_state);
+
+/**
+ * mhi_dev_configure_inactivity_timer() - Configure inactive timer.
+ * @mhi:        MHI dev structure
+ * @enable:     Flag to enable or disable timer
+ */
+int mhi_dev_configure_inactivity_timer(struct mhi_dev *mhi, bool enable);
 
 void mhi_dev_pm_relax(struct mhi_dev *mhi_ctx);
 void mhi_dev_resume_init_with_link_up(struct ep_pcie_notify *notify);

@@ -288,6 +288,14 @@ static int qmi_sensor_set_trips(void *data, int low, int high)
 	struct qmi_sensor *qmi_sens = (struct qmi_sensor *)data;
 	int ret = 0;
 
+	if (qmi_sens->tz_dev && qmi_sens->tz_dev->emul_temperature) {
+		pr_debug(
+		"%s: %s emul_temp is enabled[%d], ignoring setting trip\n",
+			__func__, qmi_sens->qmi_name,
+			qmi_sens->tz_dev->emul_temperature);
+		return ret;
+	}
+
 	if (qmi_sens->high_thresh == high &&
 		qmi_sens->low_thresh == low)
 		return ret;

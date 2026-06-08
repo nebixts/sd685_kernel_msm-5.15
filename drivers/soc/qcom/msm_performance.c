@@ -17,7 +17,9 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/kthread.h>
+#if IS_ENABLED(CONFIG_SCHED_WALT)
 #include <linux/sched/walt.h>
+#endif
 #include <soc/qcom/msm_performance.h>
 #include <soc/qcom/pmu_lib.h>
 #include <linux/spinlock.h>
@@ -84,6 +86,17 @@ static ssize_t get_splh_notif(struct kobject *kobj,
 static ssize_t set_splh_notif(struct kobject *kobj,
 	struct kobj_attribute *attr, const char *buf,
 	size_t count);
+#if IS_ENABLED(CONFIG_SCHED_WALT)
+static ssize_t get_core_ctl_register(struct kobject *kobj,
+	struct kobj_attribute *attr, char *buf);
+static ssize_t set_core_ctl_register(struct kobject *kobj,
+	struct kobj_attribute *attr, const char *buf,
+	size_t count);
+
+static struct kobj_attribute core_ctl_register_attr =
+	__ATTR(core_ctl_register, 0644, get_core_ctl_register,
+	set_core_ctl_register);
+#endif
 static ssize_t get_splh_sample_ms(struct kobject *kobj,
 	struct kobj_attribute *attr, char *buf);
 static ssize_t set_splh_sample_ms(struct kobject *kobj,
@@ -115,6 +128,7 @@ static struct kobj_attribute cpu_max_freq_attr =
 	__ATTR(cpu_max_freq, 0644, get_cpu_max_freq, set_cpu_max_freq);
 static struct kobj_attribute inst_attr =
 	__ATTR(inst, 0444, get_cpu_total_instruction, NULL);
+
 #if IS_ENABLED(CONFIG_SCHED_WALT)
 static ssize_t get_core_ctl_register(struct kobject *kobj,
 	struct kobj_attribute *attr, char *buf);

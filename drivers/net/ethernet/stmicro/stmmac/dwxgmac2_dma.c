@@ -96,6 +96,9 @@ static void dwxgmac2_dma_axi(void __iomem *ioaddr, struct stmmac_axi *axi)
 	value |= (axi->axi_rd_osr_lmt << XGMAC_RD_OSR_LMT_SHIFT) &
 		XGMAC_RD_OSR_LMT;
 
+	if (axi->axi_kbbe)
+		value |= XGMAC_ONEKBBE;
+
 	if (!axi->axi_fb)
 		value |= XGMAC_UNDEF;
 
@@ -182,7 +185,14 @@ static void dwxgmac2_dma_rx_mode(void __iomem *ioaddr, int mode,
 			rfd = 0x03; /* Full-2.5K */
 			rfa = 0x01; /* Full-1.5K */
 			break;
-
+		case 7680:
+			rfd = 0x0a; /* Full-6K */
+			rfa = 0x04; /* Full-3K */
+			break;
+		case 14336:
+			rfd = 0x18; /* Full-13K */
+			rfa = 0x12; /* Full-10K */
+			break;
 		default:
 			rfd = 0x07; /* Full-4.5K */
 			rfa = 0x04; /* Full-3K */
@@ -244,6 +254,26 @@ static void dwxgmac2_dma_tx_mode(void __iomem *ioaddr, int mode,
 	writel(value, ioaddr +  XGMAC_MTL_TXQ_OPMODE(channel));
 }
 
+static void dwxgmac2_enable_dma_ts_irq(void __iomem *ioaddr, u32 chan,
+				       bool rx, bool tx)
+{
+	u32 value = readl(ioaddr + XGMAC_DMA_CH_INT_EN(chan));
+	u32 intr_en = 0;
+
+	if (rx)
+		value |= XGMAC_DMA_INT_DEFAULT_RX;
+	if (tx) {
+		value |= XGMAC_DMA_INT_DEFAULT_TX;
+		/* Enable Timestamp interrupt */
+		if (chan == AUX_TS_CHANNEL) {
+			intr_en = readl(ioaddr + XGMAC_INT_EN);
+			intr_en |= XGMAC_TSIE;
+			writel(intr_en, ioaddr + XGMAC_INT_EN);
+		}
+	}
+	writel(value, ioaddr + XGMAC_DMA_CH_INT_EN(chan));
+}
+
 static void dwxgmac2_enable_dma_irq(void __iomem *ioaddr, u32 chan,
 				    bool rx, bool tx)
 {
@@ -254,6 +284,26 @@ static void dwxgmac2_enable_dma_irq(void __iomem *ioaddr, u32 chan,
 	if (tx)
 		value |= XGMAC_DMA_INT_DEFAULT_TX;
 
+	writel(value, ioaddr + XGMAC_DMA_CH_INT_EN(chan));
+}
+
+static void dwxgmac2_disable_dma_ts_irq(void __iomem *ioaddr, u32 chan,
+					bool rx, bool tx)
+{
+	u32 value = readl(ioaddr + XGMAC_DMA_CH_INT_EN(chan));
+	u32 intr_en = 0;
+
+	if (rx)
+		value &= ~XGMAC_DMA_INT_DEFAULT_RX;
+	if (tx) {
+		value &= ~XGMAC_DMA_INT_DEFAULT_TX;
+		/* Disable Timestamp interrupt */
+		if (chan == AUX_TS_CHANNEL) {
+			intr_en = readl(ioaddr + XGMAC_INT_EN);
+			intr_en &= ~XGMAC_TSIE;
+			writel(intr_en, ioaddr + XGMAC_INT_EN);
+		}
+	}
 	writel(value, ioaddr + XGMAC_DMA_CH_INT_EN(chan));
 }
 
@@ -285,15 +335,17 @@ static void dwxgmac2_dma_start_tx(void __iomem *ioaddr, u32 chan)
 
 static void dwxgmac2_dma_stop_tx(void __iomem *ioaddr, u32 chan)
 {
+	int ret;
 	u32 value;
 
 	value = readl(ioaddr + XGMAC_DMA_CH_TX_CONTROL(chan));
 	value &= ~XGMAC_TXST;
 	writel(value, ioaddr + XGMAC_DMA_CH_TX_CONTROL(chan));
 
-	value = readl(ioaddr + XGMAC_TX_CONFIG);
-	value &= ~XGMAC_CONFIG_TE;
-	writel(value, ioaddr + XGMAC_TX_CONFIG);
+	ret = readl_poll_timeout(ioaddr + XGMAC_DMA_CH_STATUS(chan), value,
+				 value & XGMAC_TPS, 1, 100000);
+	if (ret)
+		pr_err("%s Tx DMA (%d) is not in stopped state\n", __func__, chan);
 }
 
 static void dwxgmac2_dma_start_rx(void __iomem *ioaddr, u32 chan)
@@ -301,6 +353,7 @@ static void dwxgmac2_dma_start_rx(void __iomem *ioaddr, u32 chan)
 	u32 value;
 
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
+	value &= ~XGMAC_RPF;
 	value |= XGMAC_RXST;
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
 
@@ -311,11 +364,18 @@ static void dwxgmac2_dma_start_rx(void __iomem *ioaddr, u32 chan)
 
 static void dwxgmac2_dma_stop_rx(void __iomem *ioaddr, u32 chan)
 {
+	int ret;
 	u32 value;
 
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
+	value |= XGMAC_RPF;
 	value &= ~XGMAC_RXST;
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
+
+	ret = readl_poll_timeout(ioaddr + XGMAC_DMA_CH_STATUS(chan), value,
+				 value & XGMAC_RPS, 1, 100000);
+	if (ret)
+		pr_err("%s Rx DMA (%d) is not in stopped state\n", __func__, chan);
 }
 
 static int dwxgmac2_dma_interrupt(void __iomem *ioaddr,
@@ -335,7 +395,8 @@ static int dwxgmac2_dma_interrupt(void __iomem *ioaddr,
 	if (unlikely(intr_status & XGMAC_AIS)) {
 		if (unlikely(intr_status & XGMAC_RBU)) {
 			x->rx_buf_unav_irq++;
-			ret |= handle_rx;
+			x->rxq_stats[chan].rx_buf_unav_irq++;
+			ret |= (handle_rx | RBU_ERR);
 		}
 		if (unlikely(intr_status & XGMAC_TPS)) {
 			x->tx_process_stopped_irq++;
@@ -343,6 +404,7 @@ static int dwxgmac2_dma_interrupt(void __iomem *ioaddr,
 		}
 		if (unlikely(intr_status & XGMAC_FBE)) {
 			x->fatal_bus_error_irq++;
+			x->txq_stats[chan].fatal_bus_error_irq++;
 			ret |= tx_hard_error;
 		}
 	}
@@ -353,11 +415,18 @@ static int dwxgmac2_dma_interrupt(void __iomem *ioaddr,
 
 		if (likely(intr_status & XGMAC_RI)) {
 			x->rx_normal_irq_n++;
+			x->rxq_stats[chan].rx_normal_irq_n++;
 			ret |= handle_rx;
 		}
-		if (likely(intr_status & (XGMAC_TI | XGMAC_TBU))) {
+		if (likely(intr_status & XGMAC_TI)) {
 			x->tx_normal_irq_n++;
+			x->txq_stats[chan].tx_normal_irq_n++;
 			ret |= handle_tx;
+		}
+		if (likely(intr_status & XGMAC_TBU)) {
+			x->tx_buf_unav_irq++;
+			x->txq_stats[chan].tx_buf_unav_irq++;
+			ret |= (handle_tx | TDU_ERR);
 		}
 	}
 
@@ -390,11 +459,23 @@ static int dwxgmac2_get_hw_feature(void __iomem *ioaddr,
 
 	/* MAC HW feature 1 */
 	hw_cap = readl(ioaddr + XGMAC_HW_FEATURE1);
+	/* L3-L4 filtering support */
 	dma_cap->l3l4fnum = (hw_cap & XGMAC_HWFEAT_L3L4FNUM) >> 27;
+	/* If L3L4FNUM < 8, then the number of L3L4 filters supported by
+	 * XGMAC is equal to L3L4FNUM. From L3L4FNUM >= 8 the number of
+	 * L3L4 filters goes on like 8, 16, 32, ... Current maximum of
+	 * L3L4FNUM = 10.
+	 */
+	if (dma_cap->l3l4fnum >= 8 && dma_cap->l3l4fnum <= 10)
+		dma_cap->l3l4fnum = 8 << (dma_cap->l3l4fnum - 8);
+	else if (dma_cap->l3l4fnum > 10)
+		dma_cap->l3l4fnum = 32;
+
 	dma_cap->hash_tb_sz = (hw_cap & XGMAC_HWFEAT_HASHTBLSZ) >> 24;
 	dma_cap->rssen = (hw_cap & XGMAC_HWFEAT_RSSEN) >> 20;
 	dma_cap->tsoen = (hw_cap & XGMAC_HWFEAT_TSOEN) >> 18;
-	dma_cap->sphen = (hw_cap & XGMAC_HWFEAT_SPHEN) >> 17;
+	/* dma_cap->sphen = (hw_cap & XGMAC_HWFEAT_SPHEN) >> 17; */
+	dma_cap->sphen = 0;
 
 	dma_cap->addr64 = (hw_cap & XGMAC_HWFEAT_ADDR64) >> 14;
 	switch (dma_cap->addr64) {
@@ -429,6 +510,11 @@ static int dwxgmac2_get_hw_feature(void __iomem *ioaddr,
 	dma_cap->number_rx_queues =
 		((hw_cap & XGMAC_HWFEAT_RXQCNT) >> 0) + 1;
 
+	/* IEEE 1588-2002 */
+	dma_cap->time_stamp = 0;
+	/* Number of Auxiliary Snapshot Inputs */
+	dma_cap->aux_snapshot_n = (hw_cap & GMAC_HW_FEAT_AUXSNAPNUM) >> 28;
+
 	/* MAC HW feature 3 */
 	hw_cap = readl(ioaddr + XGMAC_HW_FEATURE3);
 	dma_cap->tbssel = (hw_cap & XGMAC_HWFEAT_TBSSEL) >> 27;
@@ -441,6 +527,31 @@ static int dwxgmac2_get_hw_feature(void __iomem *ioaddr,
 	dma_cap->frpes = (hw_cap & XGMAC_HWFEAT_FRPES) >> 11;
 	dma_cap->frpbs = (hw_cap & XGMAC_HWFEAT_FRPPB) >> 9;
 	dma_cap->frpsel = (hw_cap & XGMAC_HWFEAT_FRPSEL) >> 3;
+	/* Extended VLAN tag filters supported */
+	dma_cap->nrvf_num = (hw_cap & XGMAC_HWFEAT_NRVF) >> 0;
+	switch (dma_cap->nrvf_num) {
+	case 0:
+		dma_cap->nrvf_num = 0;
+		break;
+	case 1:
+		dma_cap->nrvf_num = 4;
+		break;
+	case 2:
+		dma_cap->nrvf_num = 8;
+		break;
+	case 3:
+		dma_cap->nrvf_num = 16;
+		break;
+	case 4:
+		dma_cap->nrvf_num = 24;
+		break;
+	case 5:
+		dma_cap->nrvf_num = 32;
+		break;
+	default:
+		dma_cap->nrvf_num = 0;
+	}
+
 
 	return 0;
 }
@@ -547,6 +658,32 @@ static int dwxgmac2_enable_tbs(void __iomem *ioaddr, bool en, u32 chan)
 	return 0;
 }
 
+static void dwxgmac2_desc_stats(void __iomem *ioaddr,
+				struct stmmac_extra_stats *xstats,
+				u32 tx_queues,
+				u32 rx_queues)
+{
+	u32 chno;
+
+	for (chno = 0; chno < tx_queues; chno++) {
+		xstats->txq_stats[chno].txch_desc_list_laddr =
+			readl(ioaddr + XGMAC_DMA_CH_TxDESC_LADDR(chno));
+		xstats->txq_stats[chno].txch_desc_ring_len =
+			readl(ioaddr + XGMAC_DMA_CH_TxDESC_RING_LEN(chno)) & (XGMAC_TDRL);
+		xstats->txq_stats[chno].txch_desc_tail =
+			readl(ioaddr + XGMAC_DMA_CH_TxDESC_TAIL_LPTR(chno));
+	}
+
+	for (chno = 0; chno <  rx_queues; chno++) {
+		xstats->rxq_stats[chno].rxch_desc_list_laddr =
+			readl(ioaddr + XGMAC_DMA_CH_RxDESC_LADDR(chno));
+		xstats->rxq_stats[chno].rxch_desc_ring_len =
+			readl(ioaddr + XGMAC_DMA_CH_RxDESC_RING_LEN(chno)) & (XGMAC_RDRL);
+		xstats->rxq_stats[chno].rxch_desc_tail =
+			readl(ioaddr + XGMAC_DMA_CH_RxDESC_TAIL_LPTR(chno));
+	}
+}
+
 const struct stmmac_dma_ops dwxgmac210_dma_ops = {
 	.reset = dwxgmac2_dma_reset,
 	.init = dwxgmac2_dma_init,
@@ -558,7 +695,9 @@ const struct stmmac_dma_ops dwxgmac210_dma_ops = {
 	.dma_rx_mode = dwxgmac2_dma_rx_mode,
 	.dma_tx_mode = dwxgmac2_dma_tx_mode,
 	.enable_dma_irq = dwxgmac2_enable_dma_irq,
+	.enable_dma_ts_irq = dwxgmac2_enable_dma_ts_irq,
 	.disable_dma_irq = dwxgmac2_disable_dma_irq,
+	.disable_dma_ts_irq = dwxgmac2_disable_dma_ts_irq,
 	.start_tx = dwxgmac2_dma_start_tx,
 	.stop_tx = dwxgmac2_dma_stop_tx,
 	.start_rx = dwxgmac2_dma_start_rx,
@@ -575,4 +714,5 @@ const struct stmmac_dma_ops dwxgmac210_dma_ops = {
 	.set_bfsize = dwxgmac2_set_bfsize,
 	.enable_sph = dwxgmac2_enable_sph,
 	.enable_tbs = dwxgmac2_enable_tbs,
+	.desc_stats = dwxgmac2_desc_stats,
 };

@@ -453,4 +453,26 @@ config ETHTOOL_NETLINK
 	  netlink. It provides better extensibility and some new features,
 	  e.g. notification messages.
 
+#Shortcut-forwarding-engine
+config ENABLE_SFE
+	bool "Enable Shortcut-forwarding-engine"
+
+	help
+	  ENABLE_SFE enables software acceleration on the target.
+          The change supports Shortcut forwarding engine feature.
+	  Includes following changes, Add support to packet threshold events.
+	  Changes to support Shortcut Forward Engine.
+	  Add bridge API to access the bridge slave port.
+
+#Generic-Software-Bridge
+config ENABLE_GSB
+        bool "Enable generic-software-bridge"
+
+        help
+          ENABLE_GSB enables software acceleration on the target via gsb.
+          The change supports generic software bridge.
+          Helps to include gsb hook on the kernel.
+          Fulfills requirement of GSB network stack receive.
+          Change is supposed to go only on targets supporting gsb.
+
 endif   # if NET

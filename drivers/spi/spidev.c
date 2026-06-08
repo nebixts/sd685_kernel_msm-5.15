@@ -81,7 +81,7 @@ struct spidev_data {
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
-static unsigned int bufsiz = 35000;
+static unsigned int bufsiz = 4096;
 module_param(bufsiz, uint, S_IRUGO);
 MODULE_PARM_DESC(bufsiz, "data bytes in biggest supported SPI message");
 
@@ -701,7 +701,10 @@ MODULE_DEVICE_TABLE(spi, spidev_spi_ids);
  * spidev should never be referenced in DT without a specific compatible string,
  * it is a Linux implementation thing rather than a description of the hardware.
  */
+<<<<<<< HEAD
 
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 static int spidev_of_check(struct device *dev)
 {
 	if (device_property_match_string(dev, "compatible", "spidev") < 0)
@@ -712,6 +715,7 @@ static int spidev_of_check(struct device *dev)
 }
 
 static const struct of_device_id spidev_dt_ids[] = {
+<<<<<<< HEAD
 	{ .compatible = "rohm,dh2228fv" },
 	{ .compatible = "lineartechnology,ltc2488" },
 	{ .compatible = "semtech,sx1301" },
@@ -720,6 +724,8 @@ static const struct of_device_id spidev_dt_ids[] = {
 	{ .compatible = "menlo,m53cpld" },
 	{ .compatible = "cisco,spi-petra" },
 	{ .compatible = "micron,spi-authenta" },
+=======
+>>>>>>> clo-stable/kernel.lnx.5.15.r68-rel
 	{ .compatible = "qcom,spi-msm-codec-slave" },
 	{ .compatible = "qcom,si5518-clk" },
 	{ .compatible = "cisco,spi-petra", .data = &spidev_of_check },

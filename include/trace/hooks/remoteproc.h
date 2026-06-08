@@ -1,4 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+
+/*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM remoteproc
 
@@ -7,7 +12,13 @@
 #if !defined(_TRACE_HOOK_RPROC_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_RPROC_H
 
+/* struct rproc */
+#include <linux/remoteproc.h>
+#if defined(CONFIG_REMOTEPROC)
+#include <trace/hooks/vendor_hooks_declare.h>
+#else
 #include <trace/hooks/vendor_hooks.h>
+#endif
 
 #ifdef __GENKSYMS__
 #include <linux/remoteproc.h>

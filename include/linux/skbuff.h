@@ -810,6 +810,10 @@ struct sk_buff {
 #endif
 	};
 
+#ifdef CONFIG_XFRM
+	struct sec_path		*sp;
+#endif
+
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	unsigned long		 _nfct;
 #endif
@@ -899,6 +903,10 @@ struct sk_buff {
 
 	__u8			ipvs_property:1;
 	__u8			inner_protocol_type:1;
+
+#ifdef CONFIG_ENABLE_SFE
+	__u8			fast_forwarded:1;
+#endif
 	__u8			remcsum_offload:1;
 #ifdef CONFIG_NET_SWITCHDEV
 	__u8			offload_fwd_mark:1;
@@ -964,6 +972,13 @@ struct sk_buff {
 
 #ifdef CONFIG_KCOV
 	u64			kcov_handle;
+#endif
+#ifdef CONFIG_IPA3
+	struct {
+		__u32 magic	:24;
+		__u32 sa_dir	:2;
+		__u32 sa_idx	:6;
+	} ipa_skb_cb;
 #endif
 
 	/* private: */

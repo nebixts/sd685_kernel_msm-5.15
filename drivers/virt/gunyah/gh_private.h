@@ -12,6 +12,8 @@
 #include <linux/gunyah.h>
 #include <linux/wait.h>
 
+#include "gvm_dump_debugfs.h"
+
 #define GH_EVENT_CREATE_VM 0
 #define GH_EVENT_DESTROY_VM 1
 #define GH_MAX_VCPUS 8
@@ -31,6 +33,7 @@ struct gh_ext_reg {
 struct gh_vm {
 	bool is_secure_vm; /* is true for Qcom authenticated secure VMs */
 	bool vm_run_once;
+	bool proxy_vm; /* is true for VMs scheduled by proxy driver*/
 	bool keep_running;
 	u32 created_vcpus;
 	u32 allowed_vcpus;
